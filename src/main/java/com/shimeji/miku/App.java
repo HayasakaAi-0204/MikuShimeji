@@ -7,9 +7,8 @@ import java.awt.Toolkit;
 public class App {
 
     // CHUẨN OOP: Cấu hình tập trung (Centralized Configuration)
-    // Loại bỏ hoàn toàn số ma thuật. Dễ dàng bảo trì và tinh chỉnh.
     private static final int PHYSICS_TICK_RATE = 33; // Tốc độ cập nhật vật lý (~30 FPS)
-    private static final int ANIMATION_TICK_RATE = 24; // Tốc độ lật ảnh (Giảm từ 200 xuống 40 để lật nhanh, mượt hơn)
+    private static final int ANIMATION_TICK_RATE = 24; // Tốc độ lật ảnh (Giảm từ 200 xuống 24 để lật nhanh, mượt hơn)
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
@@ -29,9 +28,21 @@ public class App {
         MikuWindow window = new MikuWindow(miku);
         window.setVisible(true);
 
+        // THÊM MỚI (Chuẩn OOP): Khởi tạo Trình quản lý Môi trường độc lập
+        // Tránh việc MikuCharacter phải tự đi hỏi hệ điều hành
+        TaskbarManager taskbarManager = new TaskbarManager();
+
         // 4. Vòng lặp vật lý (Chạy 30 FPS)
         Timer physicsTimer = new Timer(PHYSICS_TICK_RATE, e -> {
-            miku.updatePhysics();
+            // Bước A: Cập nhật hệ thống môi trường (Taskbar trượt lên/xuống)
+            taskbarManager.update();
+
+            // Bước B: Lấy độ cao mặt đất thực tế và truyền vào cho Miku (Dependency
+            // Injection)
+            int currentFloorY = taskbarManager.getCurrentFloorY(miku.getHeight());
+            miku.updatePhysics(currentFloorY);
+
+            // Bước C: Cập nhật View
             window.syncBounds();
             window.repaint();
         });

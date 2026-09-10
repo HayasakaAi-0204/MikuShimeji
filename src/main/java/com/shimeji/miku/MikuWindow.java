@@ -11,35 +11,49 @@ public class MikuWindow extends JWindow {
     private MikuCharacter miku;
     private Point initialClick;
 
+    // Tối ưu hóa OOP: Lưu đối tượng Menu vào thuộc tính class thay vì khởi tạo lại
+    private JPopupMenu popupMenu;
+
     public MikuWindow(MikuCharacter miku) {
         this.miku = miku;
         this.initialClick = new Point();
 
         setupWindow();
+        setupMenu(); // Tách hàm cho code sạch (Clean Code)
         setupMouseEvents();
+    }
 
-        // === TẠO MENU CHUỘT PHẢI ===
-        JPopupMenu popupMenu = new JPopupMenu();
+    private void setupWindow() {
+        setAlwaysOnTop(true);
+        setBackground(new Color(0, 0, 0, 0)); // Bật nền trong suốt 100%
 
-        // 1. Tạo các nút tính năng chờ
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                drawMiku(g);
+            }
+        };
+        panel.setOpaque(false);
+        add(panel);
+    }
+
+    private void setupMenu() {
+        popupMenu = new JPopupMenu();
+
         JMenuItem feature1 = new JMenuItem("Gọi thêm Miku (Call Another)");
         JMenuItem feature2 = new JMenuItem("Đi theo chuột (Follow Cursor)");
         feature1.setEnabled(false);
         feature2.setEnabled(false);
 
-        // 2. Tạo nút Thoát (Dismiss)
         JMenuItem exitItem = new JMenuItem("Thoát (Dismiss)");
-        exitItem.addActionListener(e -> {
-            System.exit(0);
-        });
+        exitItem.addActionListener(e -> System.exit(0));
 
-        // 3. Lắp ráp các nút vào Menu
         popupMenu.add(feature1);
         popupMenu.add(feature2);
         popupMenu.addSeparator();
         popupMenu.add(exitItem);
 
-        // Lắng nghe trạng thái của Menu
         popupMenu.addPopupMenuListener(new PopupMenuListener() {
             @Override
             public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
@@ -56,61 +70,33 @@ public class MikuWindow extends JWindow {
                 miku.setPaused(false);
             }
         });
-
-        // 4. Bắt sự kiện Click chuột phải lên bé Miku
-        this.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseReleased(MouseEvent e) {
-                if (SwingUtilities.isRightMouseButton(e)) {
-                    popupMenu.show(e.getComponent(), e.getX(), e.getY());
-                }
-            }
-        });
-    }
-
-    private void setupWindow() {
-        setAlwaysOnTop(true);
-        setBackground(new Color(0, 0, 0, 0));
-
-        JPanel panel = new JPanel() {
-            @Override
-            protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                drawMiku(g);
-            }
-        };
-        panel.setOpaque(false);
-        add(panel);
     }
 
     private void drawMiku(Graphics g) {
-        // CHUẨN OOP: Không gán cứng ảnh mặc định nữa, để Logic tự quyết định
-        BufferedImage img = null;
+        // CHUẨN OOP: Giao phó (Delegate) việc lấy ảnh cho Model. View không cần biết
+        // logic trạng thái.
+        BufferedImage img = miku.getCurrentImage();
+        if (img == null)
+            return;
+
+        // TỐI ƯU 1: Caching biến cục bộ. Tránh gọi hàm getter hàng chục lần trong 1
+        // vòng lặp vẽ.
+        int w = miku.getWidth();
+        int h = miku.getHeight();
         CharacterState state = miku.getState();
+        boolean isPaused = miku.isPaused();
 
-        // 1. ƯU TIÊN 1: Kiểm tra xem có đang mở Menu không?
-        if (miku.isPaused()) {
-            img = ResourceManager.getPausedImage(); // Lấy ảnh tĩnh (img1.png)
-        }
-        // 2. Nếu không mở Menu, xử lý các hoạt ảnh động bình thường
-        else if (state == CharacterState.DRAGGING) {
-            img = ResourceManager.getDragImages()[miku.getDragFrameIndex()];
-        } else if (state == CharacterState.FALLING) {
-            img = ResourceManager.getFallImages()[miku.getFallFrameIndex()];
-        } else if (state == CharacterState.IDLE) {
-            // THÊM MỚI: Lấy mảng 240 ảnh chờ và nhịp hiện tại từ Model
-            img = ResourceManager.getIdleImages()[miku.getIdleFrameIndex()];
-        } else if (state == CharacterState.WALKING_LEFT || state == CharacterState.WALKING_RIGHT) {
-            img = ResourceManager.getWalkImages()[miku.getWalkFrameIndex()];
-        }
+        // TỐI ƯU 2: Kích hoạt phần cứng đồ họa (Hardware Acceleration) để vẽ sắc nét
+        // hơn
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
-        if (img != null) {
-            // Sửa lỗi Moonwalk
-            if (state == CharacterState.WALKING_RIGHT && !miku.isPaused()) {
-                g.drawImage(img, miku.getWidth(), 0, -miku.getWidth(), miku.getHeight(), null);
-            } else {
-                g.drawImage(img, 0, 0, miku.getWidth(), miku.getHeight(), null);
-            }
+        // Vẽ lật ảnh (Moonwalk fix) hoặc vẽ bình thường
+        if (state == CharacterState.WALKING_RIGHT && !isPaused) {
+            g2d.drawImage(img, w, 0, -w, h, null);
+        } else {
+            g2d.drawImage(img, 0, 0, w, h, null);
         }
     }
 
@@ -126,8 +112,11 @@ public class MikuWindow extends JWindow {
 
             @Override
             public void mouseReleased(MouseEvent e) {
+                // Tối ưu gộp 2 hàm MouseListener cũ lại làm 1
                 if (SwingUtilities.isLeftMouseButton(e)) {
                     miku.setState(CharacterState.FALLING);
+                } else if (SwingUtilities.isRightMouseButton(e)) {
+                    popupMenu.show(e.getComponent(), e.getX(), e.getY());
                 }
             }
         });
