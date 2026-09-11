@@ -5,5 +5,6 @@ public enum CharacterState {
     WALKING_LEFT,
     WALKING_RIGHT,
     FALLING,
-    DRAGGING
+    DRAGGING,
+    THROWING // Trạng thái mới: Đang ném hành
 }

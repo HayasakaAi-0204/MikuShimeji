@@ -6,143 +6,171 @@ import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import java.net.URL;
 
-/**
- * Trình quản lý tài nguyên tối ưu (Resource Manager).
- * Áp dụng kỹ thuật: Pre-scaling (Thu nhỏ ảnh ngay khi đọc) để tiết kiệm 95%
- * RAM.
- */
 public class ResourceManager {
 
-    // =================================================================
-    // 1. CẤU HÌNH ĐƯỜNG DẪN & SỐ LƯỢNG FRAME
-    // =================================================================
     private static final String BASE_DIR = "/images/";
 
     public static final int TOTAL_IDLE_FRAMES = 240;
     public static final int TOTAL_WALK_FRAMES = 24;
     public static final int TOTAL_DRAG_FRAMES = 12;
     public static final int TOTAL_FALL_FRAMES = 24;
+    public static final int TOTAL_THROW_FRAMES = 212;
 
-    // CHUẨN OOP: Định nghĩa hằng số chiều cao nhân vật để thu nhỏ ảnh
     private static final int TARGET_HEIGHT = 150;
 
-    // =================================================================
-    // 2. KHO LƯU TRỮ TRONG BỘ NHỚ (Memory Cache)
-    // =================================================================
     private static BufferedImage imgPaused;
     private static BufferedImage[] imgIdle;
     private static BufferedImage[] imgWalk;
     private static BufferedImage[] imgDrag;
     private static BufferedImage[] imgFall;
+    private static BufferedImage[] imgThrow;
 
-    // Không cho phép khởi tạo object này (Utility Class)
+    private static BufferedImage imgLeek;
+
     private ResourceManager() {
     }
 
-    // =================================================================
-    // 3. LOGIC TẢI VÀ THU NHỎ ẢNH (Load & Scale)
-    // =================================================================
     public static void loadImages() {
-        System.out.println("Bắt đầu nạp và thu nhỏ tài nguyên (Tối ưu RAM)...");
+        System.out.println("Starting to load and minimize resources...");
 
-        // 1. Tải ảnh Menu (Phao cứu sinh)
-        imgPaused = loadImageAndScale("img1.png");
+        imgPaused = loadImageAndScale("img1.png", TARGET_HEIGHT);
 
-        // 2. Tải 240 frame chờ (Idle)
+        // Nạp từng bộ ảnh và ÉP DỌN RÁC (Batched GC) để tránh phình RAM
         imgIdle = new BufferedImage[TOTAL_IDLE_FRAMES];
         for (int i = 0; i < TOTAL_IDLE_FRAMES; i++) {
-            imgIdle[i] = loadFrame("miku_idle/idle_frame_%04d.png", i + 1);
+            imgIdle[i] = loadFrame("miku_idle/idle_frame_%04d.png", i + 1, TARGET_HEIGHT);
         }
+        forceGarbageCollection(); // Dọn rác ngay sau khi nạp xong đợt 1
 
-        // 3. Tải 24 frame đi bộ (Walk)
         imgWalk = new BufferedImage[TOTAL_WALK_FRAMES];
         for (int i = 0; i < TOTAL_WALK_FRAMES; i++) {
-            imgWalk[i] = loadFrame("miku_walk/miku_frame_%02d.png", i + 1);
+            imgWalk[i] = loadFrame("miku_walk/miku_frame_%02d.png", i + 1, TARGET_HEIGHT);
         }
 
-        // 4. Tải 12 frame bị kéo thả (Drag)
         imgDrag = new BufferedImage[TOTAL_DRAG_FRAMES];
         for (int i = 0; i < TOTAL_DRAG_FRAMES; i++) {
-            imgDrag[i] = loadFrame("miku_drag/miku_fly_frame_%04d.png", i + 67);
+            imgDrag[i] = loadFrame("miku_drag/miku_fly_frame_%04d.png", i + 67, TARGET_HEIGHT);
         }
 
-        // 5. Tải 24 frame rơi tự do (Fall)
         imgFall = new BufferedImage[TOTAL_FALL_FRAMES];
         for (int i = 0; i < TOTAL_FALL_FRAMES; i++) {
-            imgFall[i] = loadFrame("miku_fall/miku_fly_frame_%04d.png", i + 91);
+            imgFall[i] = loadFrame("miku_fall/miku_fly_frame_%04d.png", i + 91, TARGET_HEIGHT);
+        }
+        forceGarbageCollection(); // Dọn rác sau đợt 2
+
+        imgThrow = new BufferedImage[TOTAL_THROW_FRAMES];
+        for (int i = 0; i < TOTAL_THROW_FRAMES; i++) {
+            imgThrow[i] = loadFrame("miku_throw/miku_throw_%04d.png", i + 1, TARGET_HEIGHT);
         }
 
-        System.out.println("Nạp tài nguyên hoàn tất! RAM đã được tối ưu.");
+        // Tải cọng hành và kích hoạt Auto-Crop
+        imgLeek = loadFrame("throw_frame_leek_0192.png", -1, -1);
 
-        // Gọi Garbage Collector dọn dẹp các mảng byte rác sinh ra trong lúc resize ảnh
-        System.gc();
+        System.out.println("Resource loading complete!");
+        forceGarbageCollection(); // Dọn dẹp sạch sẽ lần cuối cùng
     }
 
-    private static BufferedImage loadFrame(String formatString, int index) {
-        String relativePath = String.format(formatString, index);
-        BufferedImage frame = loadImageAndScale(relativePath);
+    // Hàm cưỡng chế dọn rác
+    private static void forceGarbageCollection() {
+        System.gc();
+        System.runFinalization();
+    }
+
+    private static BufferedImage loadFrame(String formatString, int index, int targetHeight) {
+        String relativePath = (index == -1) ? formatString : String.format(formatString, index);
+        BufferedImage frame = loadImageAndScale(relativePath, targetHeight);
         return (frame != null) ? frame : imgPaused;
     }
 
-    /**
-     * Hàm cốt lõi chống Memory Leak: Đọc file gốc, nén nó nhỏ lại bằng
-     * TARGET_HEIGHT,
-     * lưu bản nén vào RAM và quăng bản gốc đi.
-     */
-    private static BufferedImage loadImageAndScale(String relativePath) {
+    private static BufferedImage loadImageAndScale(String relativePath, int targetHeight) {
         String fullPath = BASE_DIR + relativePath;
 
         try {
             URL url = ResourceManager.class.getResource(fullPath);
-            if (url == null) {
-                System.err.println("CẢNH BÁO: Không tìm thấy file " + fullPath);
+            if (url == null)
                 return null;
-            }
 
-            // 1. Đọc ảnh gốc nguyên bản vào RAM
+            // 1. Đọc ảnh gốc vào RAM
             BufferedImage originalImage = ImageIO.read(url);
             if (originalImage == null)
                 return null;
 
-            // 2. Tính toán tỷ lệ để thu nhỏ chiều cao về TARGET_HEIGHT (150px)
+            // 2. Cắt cọng hành (Nếu có)
+            if (targetHeight == -1) {
+                BufferedImage cropped = autoCropAndFree(originalImage);
+                // Nếu hàm autoCrop trả về một ảnh MỚI, ta phải dọn sạch ảnh GỐC cũ
+                if (cropped != originalImage) {
+                    originalImage.flush();
+                    originalImage = null;
+                }
+                return cropped;
+            }
+
             int origWidth = originalImage.getWidth();
             int origHeight = originalImage.getHeight();
 
-            // Nếu ảnh gốc đã nhỏ hơn hoặc bằng 150px thì giữ nguyên, không cần thu nhỏ
-            if (origHeight <= TARGET_HEIGHT) {
+            if (origHeight <= targetHeight) {
                 return originalImage;
             }
 
             double ratio = (double) origWidth / origHeight;
-            int targetWidth = (int) (TARGET_HEIGHT * ratio);
+            int targetWidth = (int) (targetHeight * ratio);
 
-            // 3. Tạo một bức ảnh nhỏ (Thumbnail) trên RAM (Rất nhẹ)
-            BufferedImage scaledImage = new BufferedImage(targetWidth, TARGET_HEIGHT, BufferedImage.TYPE_INT_ARGB);
+            // 3. Tạo ảnh thu nhỏ mới bằng hệ màu TỐI ƯU NHẤT CHO RAM
+            BufferedImage scaledImage = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = scaledImage.createGraphics();
 
-            // Cấu hình chất lượng thu nhỏ siêu mượt (Hardware Acceleration)
             g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            // 4. Vẽ ép ảnh gốc to vào khung ảnh nhỏ
-            g2d.drawImage(originalImage, 0, 0, targetWidth, TARGET_HEIGHT, null);
-            g2d.dispose();
+            g2d.drawImage(originalImage, 0, 0, targetWidth, targetHeight, null);
+            g2d.dispose(); // Giải phóng cọ vẽ ngay lập tức
 
-            // 5. Giải phóng ảnh khổng lồ nguyên bản khỏi bộ nhớ! (Quan trọng nhất)
+            // 4. DỌN SẠCH ẢNH GỐC KHỔNG LỒ KHỎI RAM
             originalImage.flush();
+            originalImage = null; // Cực kỳ quan trọng: Ép tham chiếu về null để GC dọn ngay
 
             return scaledImage;
 
         } catch (Exception e) {
-            System.err.println("LỖI: Không thể đọc file " + fullPath);
             return null;
         }
     }
 
-    // =================================================================
-    // 4. GETTER ĐỂ LẤY DỮ LIỆU TỪ VIEW (Encapsulation)
-    // =================================================================
+    private static BufferedImage autoCropAndFree(BufferedImage source) {
+        int minX = source.getWidth(), minY = source.getHeight(), maxX = 0, maxY = 0;
+        boolean found = false;
+
+        for (int y = 0; y < source.getHeight(); y++) {
+            for (int x = 0; x < source.getWidth(); x++) {
+                if (((source.getRGB(x, y) >> 24) & 0xff) > 0) {
+                    if (x < minX)
+                        minX = x;
+                    if (y < minY)
+                        minY = y;
+                    if (x > maxX)
+                        maxX = x;
+                    if (y > maxY)
+                        maxY = y;
+                    found = true;
+                }
+            }
+        }
+
+        if (found) {
+            int w = maxX - minX + 1;
+            int h = maxY - minY + 1;
+            BufferedImage cropped = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = cropped.createGraphics();
+            g.drawImage(source, 0, 0, w, h, minX, minY, maxX + 1, maxY + 1, null);
+            g.dispose();
+
+            return cropped;
+        }
+        return source;
+    }
+
     public static BufferedImage getPausedImage() {
         return imgPaused;
     }
@@ -161,5 +189,13 @@ public class ResourceManager {
 
     public static BufferedImage[] getFallImages() {
         return imgFall;
+    }
+
+    public static BufferedImage[] getThrowImages() {
+        return imgThrow;
+    }
+
+    public static BufferedImage getLeekImage() {
+        return imgLeek;
     }
 }

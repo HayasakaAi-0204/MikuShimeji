@@ -8,18 +8,23 @@ public class MikuCharacter {
     private static final int SIDE_PADDING = 60;
 
     private int x, y;
-
-    // TỐI ƯU HÓA HIỆU NĂNG & TỶ LỆ KHUNG HÌNH (Lazy Initialization)
     private int height = 150;
-    // Gán width = -1 để đánh dấu là "chưa được tính toán"
-    private int width = -1;
+    private int width = 150;
 
     private CharacterState state;
-
     private int walkFrameIndex = 0;
     private int dragFrameIndex = 0;
     private int fallFrameIndex = 0;
     private int idleFrameIndex = 0;
+    private int throwFrameIndex = 0;
+
+    // =================================================================
+    // NÂNG CẤP OOP (Polymorphism): Sử dụng Interface thay vì Class cụ thể.
+    // Sau này Miku có thể ném bất cứ vũ khí gì implement ThrowableItem.
+    // =================================================================
+    private ThrowableItem equippedItem = new LeekItem();
+
+    private boolean facingRight = true;
 
     private int speed = 4;
     private int velocityY = 0;
@@ -28,7 +33,6 @@ public class MikuCharacter {
 
     private int stateTimer = 0;
     private boolean isPaused = false;
-
     private final int screenWidth;
 
     public MikuCharacter(int startX, int startY) {
@@ -49,6 +53,8 @@ public class MikuCharacter {
                 return ResourceManager.getFallImages()[fallFrameIndex];
             case IDLE:
                 return ResourceManager.getIdleImages()[idleFrameIndex];
+            case THROWING:
+                return ResourceManager.getThrowImages()[throwFrameIndex];
             case WALKING_LEFT:
             case WALKING_RIGHT:
                 return ResourceManager.getWalkImages()[walkFrameIndex];
@@ -57,67 +63,57 @@ public class MikuCharacter {
         }
     }
 
-    // =================================================================
-    // SỬA LẠI (Chuẩn OOP): Tính Width tự động dựa trên tỷ lệ thật của ảnh gốc
-    // =================================================================
     public int getWidth() {
-        // Nếu width chưa từng được tính toán (đang là -1)
-        if (this.width == -1) {
-            BufferedImage currentImg = getCurrentImage();
-
-            // Nếu ảnh đã tải xong, lấy tỷ lệ thật để tính Width
-            if (currentImg != null) {
-                double realRatio = (double) currentImg.getWidth() / currentImg.getHeight();
-                this.width = (int) (this.height * realRatio);
-            } else {
-                // Phao cứu sinh (Fallback): Nếu ảnh chưa kịp tải, tạm trả về height
-                return this.height;
-            }
+        BufferedImage currentImg = getCurrentImage();
+        if (currentImg != null) {
+            double realRatio = (double) currentImg.getWidth() / currentImg.getHeight();
+            this.width = (int) (this.height * realRatio);
         }
-
-        // Từ frame thứ 2 trở đi, nó chỉ trả về con số đã lưu trong Cache.
-        // CPU không phải làm toán nữa!
         return this.width;
     }
 
     public void changeState(CharacterState newState) {
         if (this.state == newState)
             return;
-        this.state = newState;
 
+        // FIX BUG EDGE CASE: Thu hồi vũ khí nếu Miku bị nhấc lên đột ngột
+        if (this.state == CharacterState.THROWING && equippedItem.isActive()) {
+            equippedItem.setInactive();
+        }
+
+        this.state = newState;
         walkFrameIndex = 0;
         dragFrameIndex = 0;
         fallFrameIndex = 0;
+        throwFrameIndex = 0;
 
         if (newState == CharacterState.IDLE) {
             int totalIdleFrames = ResourceManager.getIdleImages().length;
-            if (totalIdleFrames > 0) {
-                idleFrameIndex = (int) (Math.random() * totalIdleFrames);
-            } else {
-                idleFrameIndex = 0;
-            }
-        } else {
+            idleFrameIndex = totalIdleFrames > 0 ? (int) (Math.random() * totalIdleFrames) : 0;
+        } else if (newState == CharacterState.FALLING) {
             idleFrameIndex = 0;
-            if (newState == CharacterState.FALLING) {
-                velocityY = 0;
-            }
+            velocityY = 0;
+        } else if (newState == CharacterState.THROWING) {
+            this.facingRight = Math.random() < 0.5;
+            equippedItem.hold(this);
         }
     }
 
     public void updatePhysics(int floorY) {
+        equippedItem.updatePhysics(floorY);
+
         if (state == CharacterState.DRAGGING || isPaused)
             return;
 
         if (state == CharacterState.IDLE || state == CharacterState.WALKING_LEFT
-                || state == CharacterState.WALKING_RIGHT) {
+                || state == CharacterState.WALKING_RIGHT || state == CharacterState.THROWING) {
             this.y = floorY;
         }
 
         if (state == CharacterState.FALLING) {
             velocityY += GRAVITY;
-            if (velocityY > MAX_FALL_SPEED) {
+            if (velocityY > MAX_FALL_SPEED)
                 velocityY = MAX_FALL_SPEED;
-            }
             y += velocityY;
 
             if (y >= floorY) {
@@ -134,23 +130,22 @@ public class MikuCharacter {
         } else if (state == CharacterState.WALKING_RIGHT) {
             x += speed;
             stateTimer--;
+            facingRight = true;
 
-            // Gọi hàm getWidth() (đã được cache) để tính va chạm biên
             if (x > screenWidth - getWidth() + SIDE_PADDING || stateTimer <= 0) {
-                if (x > screenWidth - getWidth() + SIDE_PADDING) {
+                if (x > screenWidth - getWidth() + SIDE_PADDING)
                     x = screenWidth - getWidth() + SIDE_PADDING;
-                }
                 changeState(CharacterState.IDLE);
                 resetStateTimer();
             }
         } else if (state == CharacterState.WALKING_LEFT) {
             x -= speed;
             stateTimer--;
+            facingRight = false;
 
             if (x < -SIDE_PADDING || stateTimer <= 0) {
-                if (x < -SIDE_PADDING) {
+                if (x < -SIDE_PADDING)
                     x = -SIDE_PADDING;
-                }
                 changeState(CharacterState.IDLE);
                 resetStateTimer();
             }
@@ -177,6 +172,22 @@ public class MikuCharacter {
             int total = ResourceManager.getWalkImages().length;
             if (total > 0)
                 walkFrameIndex = (walkFrameIndex + 1) % total;
+        } else if (state == CharacterState.THROWING) {
+            int total = ResourceManager.getThrowImages().length;
+            if (total > 0) {
+                throwFrameIndex++;
+
+                if (throwFrameIndex < 101) {
+                    equippedItem.hold(this);
+                } else if (throwFrameIndex == 101) {
+                    equippedItem.toss(this);
+                }
+
+                if (throwFrameIndex >= total - 1) {
+                    changeState(CharacterState.IDLE);
+                    resetStateTimer();
+                }
+            }
         } else if (state == CharacterState.IDLE) {
             int total = ResourceManager.getIdleImages().length;
             if (total > 0)
@@ -228,6 +239,19 @@ public class MikuCharacter {
 
     public boolean isPaused() {
         return isPaused;
+    }
+
+    public boolean isFacingRight() {
+        return facingRight;
+    }
+
+    public void setFacingRight(boolean facingRight) {
+        this.facingRight = facingRight;
+    }
+
+    // Đã đổi kiểu trả về thành ThrowableItem
+    public ThrowableItem getEquippedItem() {
+        return equippedItem;
     }
 
     public void setPaused(boolean paused) {
