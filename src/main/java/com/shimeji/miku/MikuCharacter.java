@@ -4,63 +4,59 @@ import java.awt.Toolkit;
 import java.awt.image.BufferedImage;
 
 public class MikuCharacter {
-
-    private static final int SIDE_PADDING = 60;
+    public static final int SIDE_PADDING = 60;
 
     private int x, y;
     private int height = 150;
     private int width = 150;
-
-    private CharacterState state;
-    private int walkFrameIndex = 0;
-    private int dragFrameIndex = 0;
-    private int fallFrameIndex = 0;
-    private int idleFrameIndex = 0;
-    private int throwFrameIndex = 0;
-
-    // =================================================================
-    // NÂNG CẤP OOP (Polymorphism): Sử dụng Interface thay vì Class cụ thể.
-    // Sau này Miku có thể ném bất cứ vũ khí gì implement ThrowableItem.
-    // =================================================================
-    private ThrowableItem equippedItem = new LeekItem();
+    private int speed = 4;
+    private final int screenWidth;
 
     private boolean facingRight = true;
-
-    private int speed = 4;
-    private int velocityY = 0;
-    private static final int GRAVITY = 2;
-    private static final int MAX_FALL_SPEED = 30;
-
-    private int stateTimer = 0;
     private boolean isPaused = false;
-    private final int screenWidth;
+
+    private MikuState currentState;
+    private ThrowableItem equippedItem = new LeekItem();
+
+    // TÍNH NĂNG MỚI: HÀNG CHỜ LỆNH (Command Queue)
+    private MikuState pendingState = null;
 
     public MikuCharacter(int startX, int startY) {
         this.x = startX;
         this.y = startY;
-        this.state = CharacterState.FALLING;
         this.screenWidth = Toolkit.getDefaultToolkit().getScreenSize().width;
+
+        this.currentState = new FallState();
+        this.currentState.enter(this);
+    }
+
+    public void updatePhysics(int floorY) {
+        equippedItem.updatePhysics(floorY);
+        if (isPaused)
+            return;
+
+        currentState.updatePhysics(this, floorY);
+
+        // CHUẨN OOP: Xử lý hàng chờ lệnh
+        // Nếu Miku ĐÃ ĐÁP ĐẤT AN TOÀN (không phải đang rơi hay bị kéo) và có lệnh đang
+        // chờ
+        // thì cô ấy sẽ tự động thực thi lệnh đó ngay lập tức!
+        if (pendingState != null && !(currentState instanceof FallState) && !(currentState instanceof DragState)) {
+            changeState(pendingState);
+            pendingState = null; // Xóa lệnh khỏi hàng chờ sau khi thực thi
+        }
+    }
+
+    public void updateAnimation() {
+        if (isPaused)
+            return;
+        currentState.updateAnimation(this);
     }
 
     public BufferedImage getCurrentImage() {
         if (isPaused)
             return ResourceManager.getPausedImage();
-
-        switch (state) {
-            case DRAGGING:
-                return ResourceManager.getDragImages()[dragFrameIndex];
-            case FALLING:
-                return ResourceManager.getFallImages()[fallFrameIndex];
-            case IDLE:
-                return ResourceManager.getIdleImages()[idleFrameIndex];
-            case THROWING:
-                return ResourceManager.getThrowImages()[throwFrameIndex];
-            case WALKING_LEFT:
-            case WALKING_RIGHT:
-                return ResourceManager.getWalkImages()[walkFrameIndex];
-            default:
-                return ResourceManager.getPausedImage();
-        }
+        return currentState.getCurrentImage();
     }
 
     public int getWidth() {
@@ -72,136 +68,74 @@ public class MikuCharacter {
         return this.width;
     }
 
-    public void changeState(CharacterState newState) {
-        if (this.state == newState)
-            return;
-
-        // FIX BUG EDGE CASE: Thu hồi vũ khí nếu Miku bị nhấc lên đột ngột
-        if (this.state == CharacterState.THROWING && equippedItem.isActive()) {
-            equippedItem.setInactive();
-        }
-
-        this.state = newState;
-        walkFrameIndex = 0;
-        dragFrameIndex = 0;
-        fallFrameIndex = 0;
-        throwFrameIndex = 0;
-
-        if (newState == CharacterState.IDLE) {
-            int totalIdleFrames = ResourceManager.getIdleImages().length;
-            idleFrameIndex = totalIdleFrames > 0 ? (int) (Math.random() * totalIdleFrames) : 0;
-        } else if (newState == CharacterState.FALLING) {
-            idleFrameIndex = 0;
-            velocityY = 0;
-        } else if (newState == CharacterState.THROWING) {
-            this.facingRight = Math.random() < 0.5;
-            equippedItem.hold(this);
-        }
+    public void changeState(MikuState newState) {
+        this.currentState = newState;
+        this.currentState.enter(this);
     }
 
-    public void updatePhysics(int floorY) {
-        equippedItem.updatePhysics(floorY);
-
-        if (state == CharacterState.DRAGGING || isPaused)
-            return;
-
-        if (state == CharacterState.IDLE || state == CharacterState.WALKING_LEFT
-                || state == CharacterState.WALKING_RIGHT || state == CharacterState.THROWING) {
-            this.y = floorY;
+    public void setState(CharacterState enumState) {
+        MikuState mappedState = null;
+        switch (enumState) {
+            case DRAGGING:
+                mappedState = new DragState();
+                break;
+            case FALLING:
+                mappedState = new FallState();
+                break;
+            case IDLE:
+                mappedState = new IdleState();
+                break;
+            case THROWING:
+                mappedState = new ThrowState();
+                break;
+            case WALKING_LEFT:
+                mappedState = new WalkState(true);
+                break;
+            case WALKING_RIGHT:
+                mappedState = new WalkState(false);
+                break;
         }
 
-        if (state == CharacterState.FALLING) {
-            velocityY += GRAVITY;
-            if (velocityY > MAX_FALL_SPEED)
-                velocityY = MAX_FALL_SPEED;
-            y += velocityY;
+        if (mappedState != null) {
+            boolean isAirborne = (currentState instanceof FallState || currentState instanceof DragState);
 
-            if (y >= floorY) {
-                y = floorY;
-                changeState(CharacterState.IDLE);
-                resetStateTimer();
-            }
-        } else if (state == CharacterState.IDLE) {
-            stateTimer--;
-            if (stateTimer <= 0) {
-                changeState((Math.random() < 0.5) ? CharacterState.WALKING_LEFT : CharacterState.WALKING_RIGHT);
-                stateTimer = 40 + (int) (Math.random() * 61);
-            }
-        } else if (state == CharacterState.WALKING_RIGHT) {
-            x += speed;
-            stateTimer--;
-            facingRight = true;
-
-            if (x > screenWidth - getWidth() + SIDE_PADDING || stateTimer <= 0) {
-                if (x > screenWidth - getWidth() + SIDE_PADDING)
-                    x = screenWidth - getWidth() + SIDE_PADDING;
-                changeState(CharacterState.IDLE);
-                resetStateTimer();
-            }
-        } else if (state == CharacterState.WALKING_LEFT) {
-            x -= speed;
-            stateTimer--;
-            facingRight = false;
-
-            if (x < -SIDE_PADDING || stateTimer <= 0) {
-                if (x < -SIDE_PADDING)
-                    x = -SIDE_PADDING;
-                changeState(CharacterState.IDLE);
-                resetStateTimer();
+            // TÍNH NĂNG MỚI: Đưa vào hàng chờ
+            // Nếu Miku đang trên không mà bị ra lệnh (không phải lệnh rơi/kéo)
+            // thì đưa lệnh đó vào hàng chờ để tránh bị dịch chuyển tức thời (teleport)
+            if (isAirborne && enumState != CharacterState.DRAGGING && enumState != CharacterState.FALLING) {
+                pendingState = mappedState;
+            } else {
+                changeState(mappedState);
             }
         }
     }
 
-    private void resetStateTimer() {
-        this.stateTimer = 30 + (int) (Math.random() * 41);
+    public CharacterState getState() {
+        if (currentState instanceof DragState)
+            return CharacterState.DRAGGING;
+        if (currentState instanceof FallState)
+            return CharacterState.FALLING;
+        if (currentState instanceof ThrowState)
+            return CharacterState.THROWING;
+        if (currentState instanceof WalkState)
+            return CharacterState.WALKING_LEFT;
+        return CharacterState.IDLE;
     }
 
-    public void updateAnimation() {
-        if (isPaused)
-            return;
-
-        if (state == CharacterState.DRAGGING) {
-            int total = ResourceManager.getDragImages().length;
-            if (total > 0)
-                dragFrameIndex = (dragFrameIndex + 1) % total;
-        } else if (state == CharacterState.FALLING) {
-            int total = ResourceManager.getFallImages().length;
-            if (total > 0)
-                fallFrameIndex = (fallFrameIndex + 1) % total;
-        } else if (state == CharacterState.WALKING_LEFT || state == CharacterState.WALKING_RIGHT) {
-            int total = ResourceManager.getWalkImages().length;
-            if (total > 0)
-                walkFrameIndex = (walkFrameIndex + 1) % total;
-        } else if (state == CharacterState.THROWING) {
-            int total = ResourceManager.getThrowImages().length;
-            if (total > 0) {
-                throwFrameIndex++;
-
-                if (throwFrameIndex < 101) {
-                    equippedItem.hold(this);
-                } else if (throwFrameIndex == 101) {
-                    equippedItem.toss(this);
-                }
-
-                if (throwFrameIndex >= total - 1) {
-                    changeState(CharacterState.IDLE);
-                    resetStateTimer();
-                }
-            }
-        } else if (state == CharacterState.IDLE) {
-            int total = ResourceManager.getIdleImages().length;
-            if (total > 0)
-                idleFrameIndex = (idleFrameIndex + 1) % total;
-        }
-    }
-
-    // Getters & Setters
     public int getX() {
         return x;
     }
 
+    public void setX(int x) {
+        this.x = x;
+    }
+
     public int getY() {
         return y;
+    }
+
+    public void setY(int y) {
+        this.y = y;
     }
 
     public void setPosition(int x, int y) {
@@ -213,32 +147,16 @@ public class MikuCharacter {
         return height;
     }
 
-    public CharacterState getState() {
-        return state;
+    public int getSpeed() {
+        return speed;
     }
 
-    public void setState(CharacterState state) {
-        changeState(state);
+    public int getScreenWidth() {
+        return screenWidth;
     }
 
-    public int getWalkFrameIndex() {
-        return walkFrameIndex;
-    }
-
-    public int getDragFrameIndex() {
-        return dragFrameIndex;
-    }
-
-    public int getFallFrameIndex() {
-        return fallFrameIndex;
-    }
-
-    public int getIdleFrameIndex() {
-        return idleFrameIndex;
-    }
-
-    public boolean isPaused() {
-        return isPaused;
+    public int getSidePadding() {
+        return SIDE_PADDING;
     }
 
     public boolean isFacingRight() {
@@ -249,14 +167,16 @@ public class MikuCharacter {
         this.facingRight = facingRight;
     }
 
-    // Đã đổi kiểu trả về thành ThrowableItem
     public ThrowableItem getEquippedItem() {
         return equippedItem;
     }
 
     public void setPaused(boolean paused) {
         this.isPaused = paused;
-        if (paused)
-            changeState(CharacterState.IDLE);
+
+        if (paused && currentState instanceof ThrowState) {
+            equippedItem.setInactive();
+            changeState(new IdleState());
+        }
     }
 }

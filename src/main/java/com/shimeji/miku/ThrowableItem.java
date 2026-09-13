@@ -14,4 +14,9 @@ public interface ThrowableItem {
     void setInactive();
 
     boolean isActive();
+
+    // MỚI THÊM: Để ProjectileWindow lấy tọa độ
+    int getX();
+
+    int getY();
 }

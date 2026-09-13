@@ -18,7 +18,7 @@ public class LeekItem implements ThrowableItem {
     private boolean isFacingRight = true;
 
     private static final double GRAVITY = 1.2;
-    private static final int DISPLAY_WIDTH = 30; // Kích thước gọn gàng
+    private static final int DISPLAY_WIDTH = 30;
 
     private double rotationAngle = 0;
     private double rotationSpeed = 0;
@@ -28,22 +28,16 @@ public class LeekItem implements ThrowableItem {
         this.currentState = State.INACTIVE;
     }
 
-    // =================================================================
-    // TỌA ĐỘ LẤY ĐÀ
-    // =================================================================
     @Override
     public void hold(MikuCharacter miku) {
         this.currentState = State.HELD;
         this.isFacingRight = miku.isFacingRight();
 
-        int centerY = miku.getY() + 95; // Tầm ngực/tay
+        int centerY = miku.getY() + 95;
 
         if (this.isFacingRight) {
-            // Nhìn phải: Tính từ mép trái (x) + một khoảng cố định
             this.x = miku.getX() + 175;
         } else {
-            // Nhìn trái (Ảnh bị lật): Tính từ mép phải (x + width) - lùi lại một khoảng cố
-            // định
             this.x = miku.getX() + miku.getWidth() - 175;
         }
 
@@ -51,43 +45,29 @@ public class LeekItem implements ThrowableItem {
         this.rotationAngle = this.isFacingRight ? Math.toRadians(30) : Math.toRadians(-30);
     }
 
-    // =================================================================
-    // TỌA ĐỘ NÉM VÀ HƯỚNG BAY VẬT LÝ
-    // =================================================================
     @Override
     public void toss(MikuCharacter miku) {
         this.currentState = State.FLYING;
         this.isFacingRight = miku.isFacingRight();
 
-        // 1. Tọa độ xuất phát (Dựa theo tọa độ hold)
         int centerY = miku.getY() + 95;
 
         if (this.isFacingRight) {
-            // Tay duỗi thẳng ra bên phải
             this.x = miku.getX() + 195;
         } else {
-            // Tay duỗi thẳng ra bên trái
             this.x = miku.getX() + miku.getWidth() - 195;
         }
 
-        this.y = centerY - 15; // Hơi hất tay lên cao một chút lúc ném
-
-        // 2. Tính lực ném (Parabol ngẫu nhiên)
+        this.y = centerY - 15;
         this.velocityY = -(10 + Math.random() * 6);
         double horizontalForce = 12 + Math.random() * 8;
 
-        // =================================================================
-        // SỬA THEO YÊU CẦU: ĐẢO NGƯỢC HƯỚNG BAY
-        // Đảo ngược dấu của horizontalForce so với phiên bản trước
-        // =================================================================
         if (this.isFacingRight) {
-            // Miku nhìn hướng nào thì gán lực đẩy NGƯỢC LẠI so với code cũ
             this.velocityX = -Math.abs(horizontalForce);
         } else {
             this.velocityX = Math.abs(horizontalForce);
         }
 
-        // Tốc độ xoay của cọng hành
         this.rotationSpeed = (Math.random() * 0.4) + 0.2;
         if (!this.isFacingRight) {
             this.rotationSpeed = -this.rotationSpeed;
@@ -104,7 +84,6 @@ public class LeekItem implements ThrowableItem {
         y += velocityY;
         rotationAngle += rotationSpeed;
 
-        // Nếu bay ra khỏi màn hình (quá xa) thì vô hiệu hóa để tiết kiệm tài nguyên
         if (y > floorY + 1000 || x < -500 || x > 3000) {
             currentState = State.INACTIVE;
         }
@@ -123,7 +102,6 @@ public class LeekItem implements ThrowableItem {
         int realHeight = img.getHeight();
         int displayH = (int) ((double) DISPLAY_WIDTH * realHeight / realWidth);
 
-        // TỐI ƯU TÀI NGUYÊN: Sử dụng RenderingHints để ảnh mượt mà khi thu nhỏ/xoay
         Object oldInterpolation = g2d.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
         Object oldAntialiasing = g2d.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
         g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -131,14 +109,13 @@ public class LeekItem implements ThrowableItem {
 
         AffineTransform oldTransform = g2d.getTransform();
 
-        g2d.translate(x, y);
+        // THAY ĐỔI CHÍNH: Dịch chuyển bút vẽ ra TÂM của ProjectileWindow (60, 60)
+        // chứ không dùng tọa độ (x, y) của màn hình nữa. Tọa độ (x, y) để cho Window di
+        // chuyển.
+        g2d.translate(60, 60);
         g2d.rotate(rotationAngle);
 
-        // =================================================================
-        // ĐẢO NGƯỢC LOGIC LẬT ẢNH CỌNG HÀNH (Đồng bộ với hướng bay mới)
-        // =================================================================
         if (isFacingRight) {
-            // Vì hướng bay đã đảo ngược, logic vẽ lật cũng phải đảo ngược theo
             g2d.drawImage(img, -DISPLAY_WIDTH / 2, -displayH / 2, DISPLAY_WIDTH, displayH, null);
         } else {
             g2d.drawImage(img, DISPLAY_WIDTH / 2, -displayH / 2, -DISPLAY_WIDTH, displayH, null);
@@ -154,5 +131,15 @@ public class LeekItem implements ThrowableItem {
     @Override
     public boolean isActive() {
         return currentState != State.INACTIVE;
+    }
+
+    @Override
+    public int getX() {
+        return x;
+    }
+
+    @Override
+    public int getY() {
+        return y;
     }
 }

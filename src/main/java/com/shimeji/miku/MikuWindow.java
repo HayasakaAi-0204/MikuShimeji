@@ -11,6 +11,10 @@ public class MikuWindow extends JWindow {
     private MikuCharacter miku;
     private Point initialClick;
     private JPopupMenu popupMenu;
+    private JPanel renderPanel;
+
+    // THÊM MỚI: Biến lưu trữ thời gian đóng Menu để khắc phục lỗi của Swing
+    private long lastPopupCloseTime = 0;
 
     public MikuWindow(MikuCharacter miku) {
         this.miku = miku;
@@ -25,16 +29,15 @@ public class MikuWindow extends JWindow {
         setAlwaysOnTop(true);
         setBackground(new Color(0, 0, 0, 0));
 
-        JPanel panel = new JPanel() {
+        renderPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 drawMiku(g);
-                drawLeek((Graphics2D) g);
             }
         };
-        panel.setOpaque(false);
-        add(panel);
+        renderPanel.setOpaque(false);
+        add(renderPanel);
     }
 
     private void setupMenu() {
@@ -69,11 +72,15 @@ public class MikuWindow extends JWindow {
             @Override
             public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
                 miku.setPaused(false);
+                // THÊM MỚI: Ghi lại thời gian Menu bị tắt
+                lastPopupCloseTime = System.currentTimeMillis();
             }
 
             @Override
             public void popupMenuCanceled(PopupMenuEvent e) {
                 miku.setPaused(false);
+                // THÊM MỚI: Ghi lại thời gian Menu bị hủy
+                lastPopupCloseTime = System.currentTimeMillis();
             }
         });
     }
@@ -85,31 +92,12 @@ public class MikuWindow extends JWindow {
 
         int w = miku.getWidth();
         int h = miku.getHeight();
-        int x = miku.getX();
-        int y = miku.getY();
-
         Graphics2D g2d = (Graphics2D) g;
 
-        // =================================================================
-        // FIX BUG HƯỚNG MẶT CUỐI CÙNG (Chuẩn OOP: Single Source of Truth)
-        // =================================================================
-        // View KHÔNG ĐƯỢC PHÉP can thiệp logic lật ảnh dựa theo State.
-        // Toàn bộ ảnh gốc của Miku (đứng, đi, ném) đều quay về bên TRÁI.
-        // Do đó:
-        // - Nếu Model báo Miku nhìn sang PHẢI -> Lật ảnh.
-        // - Nếu Model báo Miku nhìn sang TRÁI -> Không lật.
-
         if (miku.isFacingRight()) {
-            g2d.drawImage(img, x + w, y, -w, h, null); // Vẽ lật (Flip X)
+            g2d.drawImage(img, w, 0, -w, h, null);
         } else {
-            g2d.drawImage(img, x, y, w, h, null); // Vẽ thuận
-        }
-    }
-
-    private void drawLeek(Graphics2D g2d) {
-        ThrowableItem item = miku.getEquippedItem(); // Sửa dòng này
-        if (item != null) {
-            item.draw(g2d);
+            g2d.drawImage(img, 0, 0, w, h, null);
         }
     }
 
@@ -117,18 +105,9 @@ public class MikuWindow extends JWindow {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                int mx = e.getX();
-                int my = e.getY();
-                int mikuX = miku.getX();
-                int mikuY = miku.getY();
-                int mikuW = miku.getWidth();
-                int mikuH = miku.getHeight();
-
-                boolean isClickOnMiku = (mx >= mikuX && mx <= mikuX + mikuW && my >= mikuY && my <= mikuY + mikuH);
-
-                if (SwingUtilities.isLeftMouseButton(e) && isClickOnMiku) {
+                if (SwingUtilities.isLeftMouseButton(e)) {
                     miku.setState(CharacterState.DRAGGING);
-                    initialClick = new Point(mx - mikuX, my - mikuY);
+                    initialClick = e.getPoint();
                 }
             }
 
@@ -139,7 +118,12 @@ public class MikuWindow extends JWindow {
                         miku.setState(CharacterState.FALLING);
                     }
                 } else if (SwingUtilities.isRightMouseButton(e)) {
-                    popupMenu.show(e.getComponent(), e.getX(), e.getY());
+                    // CẬP NHẬT: Kiểm tra khoảng thời gian.
+                    // Nếu thời gian từ lúc đóng Menu đến lúc thả chuột quá ngắn (< 150 mili-giây)
+                    // thì từ chối mở lại Menu (để Menu được đóng hẳn).
+                    if (System.currentTimeMillis() - lastPopupCloseTime > 150) {
+                        popupMenu.show(e.getComponent(), e.getX(), e.getY());
+                    }
                 }
             }
         });
@@ -148,8 +132,9 @@ public class MikuWindow extends JWindow {
             @Override
             public void mouseDragged(MouseEvent e) {
                 if (miku.getState() == CharacterState.DRAGGING) {
-                    int newX = e.getX() - initialClick.x;
-                    int newY = e.getY() - initialClick.y;
+                    Point screenLocation = e.getLocationOnScreen();
+                    int newX = screenLocation.x - initialClick.x;
+                    int newY = screenLocation.y - initialClick.y;
                     miku.setPosition(newX, newY);
                 }
             }
@@ -157,7 +142,6 @@ public class MikuWindow extends JWindow {
     }
 
     public void syncBounds() {
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        setBounds(0, 0, screenSize.width, screenSize.height);
+        setBounds(miku.getX(), miku.getY(), miku.getWidth(), miku.getHeight());
     }
 }
