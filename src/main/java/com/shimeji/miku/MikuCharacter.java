@@ -18,7 +18,6 @@ public class MikuCharacter {
     private MikuState currentState;
     private ThrowableItem equippedItem = new LeekItem();
 
-    // TÍNH NĂNG MỚI: HÀNG CHỜ LỆNH (Command Queue)
     private MikuState pendingState = null;
 
     public MikuCharacter(int startX, int startY) {
@@ -37,13 +36,9 @@ public class MikuCharacter {
 
         currentState.updatePhysics(this, floorY);
 
-        // CHUẨN OOP: Xử lý hàng chờ lệnh
-        // Nếu Miku ĐÃ ĐÁP ĐẤT AN TOÀN (không phải đang rơi hay bị kéo) và có lệnh đang
-        // chờ
-        // thì cô ấy sẽ tự động thực thi lệnh đó ngay lập tức!
         if (pendingState != null && !(currentState instanceof FallState) && !(currentState instanceof DragState)) {
             changeState(pendingState);
-            pendingState = null; // Xóa lệnh khỏi hàng chờ sau khi thực thi
+            pendingState = null;
         }
     }
 
@@ -69,6 +64,13 @@ public class MikuCharacter {
     }
 
     public void changeState(MikuState newState) {
+        // SỬA LỖI: Dọn dẹp vũ khí rác nếu Miku bị ngắt ngang hành động Xóa file (Ví dụ: Bị chuột kéo đi)
+        if (this.currentState instanceof DeleteState && !(newState instanceof DeleteState)) {
+            if (!(this.equippedItem instanceof LeekItem)) {
+                this.setEquippedItem(new LeekItem()); // Trả lại cọng hành mặc định
+            }
+        }
+
         this.currentState = newState;
         this.currentState.enter(this);
     }
@@ -99,14 +101,25 @@ public class MikuCharacter {
         if (mappedState != null) {
             boolean isAirborne = (currentState instanceof FallState || currentState instanceof DragState);
 
-            // TÍNH NĂNG MỚI: Đưa vào hàng chờ
-            // Nếu Miku đang trên không mà bị ra lệnh (không phải lệnh rơi/kéo)
-            // thì đưa lệnh đó vào hàng chờ để tránh bị dịch chuyển tức thời (teleport)
             if (isAirborne && enumState != CharacterState.DRAGGING && enumState != CharacterState.FALLING) {
                 pendingState = mappedState;
             } else {
                 changeState(mappedState);
             }
+        }
+    }
+
+    public void triggerDeleteAction(String fileName, BufferedImage fileIcon) {
+        if (currentState instanceof ThrowState || currentState instanceof DeleteState)
+            return;
+
+        DeleteState deleteState = new DeleteState(fileIcon);
+
+        boolean isAirborne = (currentState instanceof FallState || currentState instanceof DragState);
+        if (isAirborne) {
+            pendingState = deleteState;
+        } else {
+            changeState(deleteState);
         }
     }
 
@@ -122,60 +135,27 @@ public class MikuCharacter {
         return CharacterState.IDLE;
     }
 
-    public int getX() {
-        return x;
-    }
-
-    public void setX(int x) {
-        this.x = x;
-    }
-
-    public int getY() {
-        return y;
-    }
-
-    public void setY(int y) {
-        this.y = y;
-    }
-
-    public void setPosition(int x, int y) {
-        this.x = x;
-        this.y = y;
-    }
-
-    public int getHeight() {
-        return height;
-    }
-
-    public int getSpeed() {
-        return speed;
-    }
-
-    public int getScreenWidth() {
-        return screenWidth;
-    }
-
-    public int getSidePadding() {
-        return SIDE_PADDING;
-    }
-
-    public boolean isFacingRight() {
-        return facingRight;
-    }
-
-    public void setFacingRight(boolean facingRight) {
-        this.facingRight = facingRight;
-    }
-
-    public ThrowableItem getEquippedItem() {
-        return equippedItem;
-    }
+    public int getX() { return x; }
+    public void setX(int x) { this.x = x; }
+    public int getY() { return y; }
+    public void setY(int y) { this.y = y; }
+    public void setPosition(int x, int y) { this.x = x; this.y = y; }
+    public int getHeight() { return height; }
+    public int getSpeed() { return speed; }
+    public int getScreenWidth() { return screenWidth; }
+    public int getSidePadding() { return SIDE_PADDING; }
+    public boolean isFacingRight() { return facingRight; }
+    public void setFacingRight(boolean facingRight) { this.facingRight = facingRight; }
+    public ThrowableItem getEquippedItem() { return equippedItem; }
+    public void setEquippedItem(ThrowableItem item) { this.equippedItem = item; }
 
     public void setPaused(boolean paused) {
         this.isPaused = paused;
 
-        if (paused && currentState instanceof ThrowState) {
+        // SỬA LỖI: Hủy ngay hành động Xóa file nếu người dùng bấm chuột phải mở Menu
+        if (paused && (currentState instanceof ThrowState || currentState instanceof DeleteState)) {
             equippedItem.setInactive();
+            setEquippedItem(new LeekItem()); // Khôi phục cọng hành mặc định ngay lập tức
             changeState(new IdleState());
         }
     }

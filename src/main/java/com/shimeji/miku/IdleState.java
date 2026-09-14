@@ -9,12 +9,12 @@ public class IdleState implements MikuState {
     @Override
     public void enter(MikuCharacter miku) {
         frameIndex = (int) (Math.random() * ResourceManager.TOTAL_IDLE_FRAMES);
-        timer = 30 + (int) (Math.random() * 41);
+        timer = 30 + (int) (Math.random() * 273); // Đứng im từ 1 đến 10 giây
     }
 
     @Override
     public void updatePhysics(MikuCharacter miku, int floorY) {
-        miku.setY(floorY);
+        miku.setY(floorY); // Ghim chân sát mặt đất
         timer--;
         if (timer <= 0) {
             // Hết giờ đứng yên -> đi bộ ngẫu nhiên trái hoặc phải

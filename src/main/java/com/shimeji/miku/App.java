@@ -26,9 +26,13 @@ public class App {
         window.setVisible(true);
 
         // Tạo cửa sổ Con (Cọng hành) và truyền cửa sổ Cha vào
-        ProjectileWindow projectileWindow = new ProjectileWindow(window, miku.getEquippedItem());
+        ProjectileWindow projectileWindow = new ProjectileWindow(window, miku);
 
         TaskbarManager taskbarManager = new TaskbarManager();
+
+        // TÍNH NĂNG MỚI: Khởi động hệ thống "vệ tinh" theo dõi màn hình
+        DesktopWatcher watcher = new DesktopWatcher(miku);
+        watcher.startWatching();
 
         Timer physicsTimer = new Timer(PHYSICS_TICK_RATE, e -> {
             taskbarManager.update();

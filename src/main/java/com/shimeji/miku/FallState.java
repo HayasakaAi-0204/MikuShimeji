@@ -5,8 +5,8 @@ import java.awt.image.BufferedImage;
 public class FallState implements MikuState {
     private int frameIndex = 0;
     private int velocityY = 0;
-    private static final int GRAVITY = 2;
-    private static final int MAX_FALL_SPEED = 30;
+    private static final int GRAVITY = 2; // Gia tốc rơi
+    private static final int MAX_FALL_SPEED = 30; // Tốc độ rơi tối đa
 
     @Override
     public void enter(MikuCharacter miku) {
@@ -16,16 +16,17 @@ public class FallState implements MikuState {
 
     @Override
     public void updatePhysics(MikuCharacter miku, int floorY) {
-        velocityY += GRAVITY;
+        velocityY += GRAVITY; // Rơi nhanh dần đều
         if (velocityY > MAX_FALL_SPEED)
-            velocityY = MAX_FALL_SPEED;
+            velocityY = MAX_FALL_SPEED; // Đạt tốc độ rơi tối đa
 
-        int newY = miku.getY() + velocityY;
+        int newY = miku.getY() + velocityY; // Tính nhẩm vị trí tiếp theo
+        // Kiểm tra vị trí tiếp theo có phải mặt đất không
         if (newY >= floorY) {
-            miku.setY(floorY);
-            miku.changeState(new IdleState());
+            miku.setY(floorY); // Perfect landing
+            miku.changeState(new IdleState()); // Chờ-ing
         } else {
-            miku.setY(newY);
+            miku.setY(newY); // Tiếp tục rơi nếu chưa đến mặt đất
         }
     }
 

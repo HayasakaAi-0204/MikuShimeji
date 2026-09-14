@@ -8,6 +8,7 @@ public class DragState implements MikuState {
     @Override
     public void enter(MikuCharacter miku) {
         frameIndex = 0;
+        // Khi nhấc Miku lên thì cọng hành sẽ biến mất
         if (miku.getEquippedItem().isActive()) {
             miku.getEquippedItem().setInactive();
         }

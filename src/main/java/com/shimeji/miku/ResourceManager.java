@@ -15,6 +15,7 @@ public class ResourceManager {
     public static final int TOTAL_DRAG_FRAMES = 12;
     public static final int TOTAL_FALL_FRAMES = 24;
     public static final int TOTAL_THROW_FRAMES = 212;
+    public static final int TOTAL_DELETE_FRAMES = 236; 
 
     private static final int TARGET_HEIGHT = 150;
 
@@ -25,6 +26,7 @@ public class ResourceManager {
     private static BufferedImage[] imgDrag = new BufferedImage[TOTAL_DRAG_FRAMES];
     private static BufferedImage[] imgFall = new BufferedImage[TOTAL_FALL_FRAMES];
     private static BufferedImage[] imgThrow = new BufferedImage[TOTAL_THROW_FRAMES];
+    private static BufferedImage[] imgDelete = new BufferedImage[TOTAL_DELETE_FRAMES];
 
     private static BufferedImage imgLeek;
 
@@ -33,48 +35,48 @@ public class ResourceManager {
 
     public static void loadImages() {
         ImageIO.setUseCache(false);
-
-        System.out.println("Starting lightweight resource initialization...");
-
-        // 1. KÍCH THƯỚC: Phóng to/thu nhỏ ảnh Pause
-        int pausedCharacterHeight = 135;
-
-        // 2. TÙY CHỈNH DỊCH CHUYỂN (OFFSET):
-        // Nếu ảnh bị lệch sang trái/phải, thay đổi shiftX (số dương = qua phải, số âm =
-        // qua trái)
-        // Nếu ảnh bị lệch lên/xuống, thay đổi shiftY (số âm = kéo lên trên, số dương =
-        // kéo xuống dưới)
-        int shiftX = 0;
-        int shiftY = -5; // Kéo nhẹ lên trên 5 pixel để không bị dính sát đáy
+        int pausedCharacterHeight = 135; 
+        int shiftX = 0; 
+        int shiftY = -5; 
 
         BufferedImage tempImg = loadImageAndScale("img1.png", pausedCharacterHeight);
-
-        // Lấy frame Idle bình thường làm "hệ quy chiếu" để sao chép y hệt kích thước
-        // Khung ảnh
         BufferedImage referenceFrame = getIdleImage(0);
-
+        
         if (tempImg != null && referenceFrame != null) {
-            // FIX BUG LỆCH HƯỚNG 7 GIỜ: Tạo khung ảnh Pause có chiều rộng/cao BẰNG Y HỆT
-            // ảnh bình thường
             imgPaused = new BufferedImage(referenceFrame.getWidth(), TARGET_HEIGHT, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = imgPaused.createGraphics();
-
-            // Tự động Canh giữa theo chiều ngang (giải quyết lệch trái) và cộng shiftX
+            
             int drawX = (referenceFrame.getWidth() - tempImg.getWidth()) / 2 + shiftX;
-            // Canh sát đáy và cộng thêm lượng dịch chuyển shiftY (giải quyết lệch đáy)
             int drawY = (TARGET_HEIGHT - tempImg.getHeight()) + shiftY;
-
+            
             g2d.drawImage(tempImg, drawX, drawY, null);
             g2d.dispose();
-
+            
             if (tempImg != imgPaused) {
                 tempImg.flush();
             }
         }
 
         imgLeek = loadFrame("throw_frame_leek_0192.png", -1, -1);
+    }
 
-        System.out.println("Resource initialization complete! Frames will load on demand.");
+    // --- CÁC HÀM GET ẢNH ĐƯỢC CHUẨN HÓA ---
+    public static BufferedImage getThrowImage(int index) {
+        if (imgThrow[index] == null) {
+            BufferedImage raw = loadFrame("miku_throw/miku_throw_%04d.png", index + 1, TARGET_HEIGHT);
+            // SỬA LỖI: Lật ngược ảnh gốc để đồng nhất với các ảnh khác
+            imgThrow[index] = flipImageHorizontal(raw);
+        }
+        return imgThrow[index];
+    }
+
+    public static BufferedImage getDeleteImage(int index) {
+        if (imgDelete[index] == null) {
+            BufferedImage raw = loadFrame("miku_delete/miku_throw_%04d.png", index + 1, TARGET_HEIGHT);
+            // SỬA LỖI: Lật ngược ảnh gốc để đồng nhất với các ảnh khác
+            imgDelete[index] = flipImageHorizontal(raw); 
+        }
+        return imgDelete[index];
     }
 
     public static BufferedImage getIdleImage(int index) {
@@ -105,19 +107,28 @@ public class ResourceManager {
         return imgFall[index];
     }
 
-    public static BufferedImage getThrowImage(int index) {
-        if (imgThrow[index] == null) {
-            imgThrow[index] = loadFrame("miku_throw/miku_throw_%04d.png", index + 1, TARGET_HEIGHT);
-        }
-        return imgThrow[index];
-    }
-
     public static BufferedImage getPausedImage() {
         return imgPaused;
     }
 
     public static BufferedImage getLeekImage() {
         return imgLeek;
+    }
+
+    // --- HÀM ẢO THUẬT: Tự động lật ảnh ---
+    private static BufferedImage flipImageHorizontal(BufferedImage img) {
+        if (img == null) return null;
+        int w = img.getWidth();
+        int h = img.getHeight();
+        BufferedImage flipped = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = flipped.createGraphics();
+        // Thuật toán lật gương của Java Swing
+        g.drawImage(img, w, 0, -w, h, null);
+        g.dispose();
+        
+        // Giải phóng ảnh gốc khỏi RAM
+        img.flush(); 
+        return flipped;
     }
 
     private static BufferedImage loadFrame(String formatString, int index, int targetHeight) {
@@ -128,50 +139,39 @@ public class ResourceManager {
 
     private static BufferedImage loadImageAndScale(String relativePath, int targetHeight) {
         String fullPath = BASE_DIR + relativePath;
-
         try {
             URL url = ResourceManager.class.getResource(fullPath);
-            if (url == null)
-                return null;
+            if (url == null) return null;
 
             BufferedImage originalImage = ImageIO.read(url);
-            if (originalImage == null)
-                return null;
+            if (originalImage == null) return null;
 
             if (targetHeight == -1) {
                 BufferedImage cropped = autoCropAndFree(originalImage);
                 if (cropped != originalImage) {
                     originalImage.flush();
-                    originalImage = null;
                 }
                 return cropped;
             }
 
             int origWidth = originalImage.getWidth();
             int origHeight = originalImage.getHeight();
-
-            if (origHeight <= targetHeight) {
-                return originalImage;
-            }
+            if (origHeight <= targetHeight) return originalImage;
 
             double ratio = (double) origWidth / origHeight;
             int targetWidth = (int) (targetHeight * ratio);
 
             BufferedImage scaledImage = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = scaledImage.createGraphics();
-
             g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
             g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
             g2d.drawImage(originalImage, 0, 0, targetWidth, targetHeight, null);
             g2d.dispose();
-
             originalImage.flush();
-            originalImage = null;
 
             return scaledImage;
-
         } catch (Exception e) {
             return null;
         }
@@ -184,14 +184,10 @@ public class ResourceManager {
         for (int y = 0; y < source.getHeight(); y++) {
             for (int x = 0; x < source.getWidth(); x++) {
                 if (((source.getRGB(x, y) >> 24) & 0xff) > 0) {
-                    if (x < minX)
-                        minX = x;
-                    if (y < minY)
-                        minY = y;
-                    if (x > maxX)
-                        maxX = x;
-                    if (y > maxY)
-                        maxY = y;
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
                     found = true;
                 }
             }

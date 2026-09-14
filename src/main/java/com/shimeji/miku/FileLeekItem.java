@@ -5,22 +5,29 @@ import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 
-public class LeekItem implements ThrowableItem {
+public class FileLeekItem implements ThrowableItem {
 
     public enum State {
         INACTIVE, HELD, FLYING
     }
 
     private State currentState = State.INACTIVE;
-
     private int x, y;
     private double velocityX, velocityY;
     private boolean isFacingRight = true;
+
     private static final double GRAVITY = 1.2;
     private static final int DISPLAY_WIDTH = 30;
+    private static final int ICON_SIZE = 24;
 
     private double rotationAngle = 0;
     private double rotationSpeed = 0;
+
+    private BufferedImage fileIcon;
+
+    public FileLeekItem(BufferedImage fileIcon) {
+        this.fileIcon = fileIcon;
+    }
 
     @Override
     public void setInactive() {
@@ -31,12 +38,12 @@ public class LeekItem implements ThrowableItem {
     public void hold(MikuCharacter miku) {
         this.currentState = State.HELD;
         this.isFacingRight = miku.isFacingRight();
-        int centerY = miku.getY() + 80;
+        int centerY = miku.getY() + 90;
 
         if (this.isFacingRight) {
-            this.x = miku.getX() + miku.getWidth() - 175;
+            this.x = miku.getX() + miku.getWidth() - 160;
         } else {
-            this.x = miku.getX() + 175;
+            this.x = miku.getX() + 160;
         }
 
         this.y = centerY;
@@ -56,8 +63,9 @@ public class LeekItem implements ThrowableItem {
         }
 
         this.y = centerY - 15;
-        this.velocityY = -(10 + Math.random() * 6);
-        double horizontalForce = 12 + Math.random() * 8;
+
+        this.velocityY = -(12 + Math.random() * 6);
+        double horizontalForce = 15 + Math.random() * 8;
 
         if (this.isFacingRight) {
             this.velocityX = Math.abs(horizontalForce);
@@ -75,6 +83,7 @@ public class LeekItem implements ThrowableItem {
     public void updatePhysics(int floorY) {
         if (currentState != State.FLYING)
             return;
+
         velocityY += GRAVITY;
         x += velocityX;
         y += velocityY;
@@ -89,6 +98,7 @@ public class LeekItem implements ThrowableItem {
     public void draw(Graphics2D g2d) {
         if (currentState == State.INACTIVE)
             return;
+
         BufferedImage img = ResourceManager.getLeekImage();
         if (img == null)
             return;
@@ -109,8 +119,14 @@ public class LeekItem implements ThrowableItem {
         // ĐÃ SỬA LỖI: Thêm dấu "!" để lật ngược đầu/đuôi cọng hành cho đúng chiều
         if (!isFacingRight) {
             g2d.drawImage(img, -DISPLAY_WIDTH / 2, -displayH / 2, DISPLAY_WIDTH, displayH, null);
+            if (fileIcon != null) {
+                g2d.drawImage(fileIcon, -ICON_SIZE / 2, -displayH / 2 + 5, ICON_SIZE, ICON_SIZE, null);
+            }
         } else {
             g2d.drawImage(img, DISPLAY_WIDTH / 2, -displayH / 2, -DISPLAY_WIDTH, displayH, null);
+            if (fileIcon != null) {
+                g2d.drawImage(fileIcon, -ICON_SIZE / 2, -displayH / 2 + 5, ICON_SIZE, ICON_SIZE, null);
+            }
         }
 
         g2d.setTransform(oldTransform);
