@@ -14,7 +14,7 @@ public class WalkState implements MikuState {
     @Override
     public void enter(MikuCharacter miku) {
         frameIndex = 0;
-        timer = 40 + (int) (Math.random() * 61);
+        timer = 150 + (int) (Math.random() * 300);
         miku.setFacingRight(!isLeft);
     }
 
@@ -27,16 +27,25 @@ public class WalkState implements MikuState {
         timer--;
 
         int screenLimit = miku.getScreenWidth() - miku.getWidth() + miku.getSidePadding();
+        
         if (isLeft) {
             if (newX < -miku.getSidePadding() || timer <= 0) {
-                if (newX < -miku.getSidePadding())
+                if (newX < -miku.getSidePadding()) {
                     miku.setX(-miku.getSidePadding());
+                    // CẬP NHẬT: 100% leo lên khi đụng tường (Thay vì 50% như cũ)
+                    miku.changeState(new ClimbState(true, true));
+                    return;
+                }
                 miku.changeState(new IdleState());
             }
         } else {
             if (newX > screenLimit || timer <= 0) {
-                if (newX > screenLimit)
+                if (newX > screenLimit) {
                     miku.setX(screenLimit);
+                    // CẬP NHẬT: 100% leo lên khi đụng tường
+                    miku.changeState(new ClimbState(false, true));
+                    return;
+                }
                 miku.changeState(new IdleState());
             }
         }

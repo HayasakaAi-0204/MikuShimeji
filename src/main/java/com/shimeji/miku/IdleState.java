@@ -10,6 +10,15 @@ public class IdleState implements MikuState {
     public void enter(MikuCharacter miku) {
         frameIndex = (int) (Math.random() * ResourceManager.TOTAL_IDLE_FRAMES);
         timer = 30 + (int) (Math.random() * 273); // Đứng im từ 1 đến 10 giây
+
+        // RÀ SOÁT LỖI: Tránh trường hợp Miku vô tình bị rơi lọt ra ngoài mép màn hình 
+        // (Vd: ném quá mạnh ra ngoài góc) khiến cô bé bị "tàng hình" lúc đáp xuống.
+        int screenLimit = miku.getScreenWidth() - miku.getWidth() + miku.getSidePadding();
+        if (miku.getX() < -miku.getSidePadding()) {
+            miku.setX(-miku.getSidePadding()); // Ép về lại mép trái
+        } else if (miku.getX() > screenLimit) {
+            miku.setX(screenLimit); // Ép về lại mép phải
+        }
     }
 
     @Override

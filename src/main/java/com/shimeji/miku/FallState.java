@@ -16,17 +16,33 @@ public class FallState implements MikuState {
 
     @Override
     public void updatePhysics(MikuCharacter miku, int floorY) {
-        velocityY += GRAVITY; // Rơi nhanh dần đều
+        velocityY += GRAVITY; 
         if (velocityY > MAX_FALL_SPEED)
-            velocityY = MAX_FALL_SPEED; // Đạt tốc độ rơi tối đa
+            velocityY = MAX_FALL_SPEED; 
 
-        int newY = miku.getY() + velocityY; // Tính nhẩm vị trí tiếp theo
-        // Kiểm tra vị trí tiếp theo có phải mặt đất không
+        int newY = miku.getY() + velocityY; 
+        
+        // 1. Kiểm tra xem đã chạm mặt đất chưa
         if (newY >= floorY) {
-            miku.setY(floorY); // Perfect landing
-            miku.changeState(new IdleState()); // Chờ-ing
+            miku.setY(floorY); 
+            miku.changeState(new IdleState()); 
+            return;
         } else {
-            miku.setY(newY); // Tiếp tục rơi nếu chưa đến mặt đất
+            miku.setY(newY); 
+        }
+
+        // 2. CẬP NHẬT: Phản xạ bám tường!
+        int screenLimit = miku.getScreenWidth() - miku.getWidth() + miku.getSidePadding();
+        
+        if (miku.getX() <= -miku.getSidePadding()) {
+            miku.setX(-miku.getSidePadding());
+            // Gọi ClimbState với tham số isResting = true (để Miku dùng ảnh pause bám dính vào tường)
+            miku.changeState(new ClimbState(true, false, true)); 
+        } 
+        else if (miku.getX() >= screenLimit) {
+            miku.setX(screenLimit);
+            // Bám tường phải
+            miku.changeState(new ClimbState(false, false, true));
         }
     }
 

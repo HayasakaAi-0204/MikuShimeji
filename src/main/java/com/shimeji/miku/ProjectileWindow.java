@@ -4,7 +4,6 @@ import javax.swing.*;
 import java.awt.*;
 
 public class ProjectileWindow extends JWindow {
-    // SỬA LỖI: Không lưu vũ khí cố định nữa, mà lưu lại Miku để luôn cập nhật
     private MikuCharacter miku;
 
     private static final int WINDOW_SIZE = 120;
@@ -12,8 +11,11 @@ public class ProjectileWindow extends JWindow {
     public ProjectileWindow(Window owner, MikuCharacter miku) {
         super(owner, owner.getGraphicsConfiguration());
 
-        this.miku = miku; // Lưu Miku lại
+        this.miku = miku; 
         setAlwaysOnTop(true);
+        
+        // SỬA LỖI: Không cho phép Cửa sổ vũ khí giành Focus
+        setFocusableWindowState(false);
 
         setBackground(new Color(0, 0, 0, 0));
         getContentPane().setBackground(new Color(0, 0, 0, 0));
@@ -22,7 +24,6 @@ public class ProjectileWindow extends JWindow {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                // CHUẨN OOP: Hỏi Miku xem đang cầm vũ khí gì để vẽ
                 ThrowableItem item = miku.getEquippedItem();
                 if (item != null && item.isActive()) {
                     item.draw((Graphics2D) g);
@@ -36,7 +37,6 @@ public class ProjectileWindow extends JWindow {
     }
 
     public void syncBounds() {
-        // CHUẨN OOP: Cập nhật tọa độ theo vũ khí hiện tại
         ThrowableItem item = miku.getEquippedItem();
         
         if (item == null || !item.isActive()) {

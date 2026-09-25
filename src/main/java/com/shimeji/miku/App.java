@@ -2,6 +2,7 @@ package com.shimeji.miku;
 
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
+import javax.swing.JPopupMenu;
 import java.awt.Toolkit;
 
 public class App {
@@ -10,6 +11,10 @@ public class App {
     private static final int ANIMATION_TICK_RATE = 24;
 
     public static void main(String[] args) {
+        // 👉 SỬA LỖI MENU BỊ CẮT: Tắt tính năng Lightweight Popup 
+        // Bắt buộc Menu phải bung ra thành một cửa sổ xịn độc lập để không bị giới hạn bởi kích thước của Miku
+        JPopupMenu.setDefaultLightWeightPopupEnabled(false);
+
         SwingUtilities.invokeLater(() -> {
             startShimeji();
         });

@@ -13,8 +13,8 @@ public class MikuWindow extends JWindow {
     private JPopupMenu popupMenu;
     private JPanel renderPanel;
 
-    // THÊM MỚI: Biến lưu trữ thời gian đóng Menu để khắc phục lỗi của Swing
     private long lastPopupCloseTime = 0;
+    private boolean isLeftMouseDown = false; // 👉 THÊM MỚI: Biến cảm nhận ngón tay đang đè chuột trái
 
     public MikuWindow(MikuCharacter miku) {
         this.miku = miku;
@@ -27,6 +27,7 @@ public class MikuWindow extends JWindow {
 
     private void setupWindow() {
         setAlwaysOnTop(true);
+        setFocusableWindowState(false); 
         setBackground(new Color(0, 0, 0, 0));
 
         renderPanel = new JPanel() {
@@ -72,15 +73,25 @@ public class MikuWindow extends JWindow {
             @Override
             public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
                 miku.setPaused(false);
-                // THÊM MỚI: Ghi lại thời gian Menu bị tắt
                 lastPopupCloseTime = System.currentTimeMillis();
+                setAlwaysOnTop(true);
+                
+                // 👉 SỬA LỖI TUỘT TAY:
+                // Khi tắt Menu, CHỈ cho Miku rơi xuống nếu bạn KHÔNG CÒN giữ chuột trái!
+                if (miku.getState() == CharacterState.DRAGGING && !isLeftMouseDown) {
+                    miku.setState(CharacterState.FALLING);
+                }
             }
 
             @Override
             public void popupMenuCanceled(PopupMenuEvent e) {
                 miku.setPaused(false);
-                // THÊM MỚI: Ghi lại thời gian Menu bị hủy
                 lastPopupCloseTime = System.currentTimeMillis();
+                setAlwaysOnTop(true);
+                
+                if (miku.getState() == CharacterState.DRAGGING && !isLeftMouseDown) {
+                    miku.setState(CharacterState.FALLING);
+                }
             }
         });
     }
@@ -101,30 +112,71 @@ public class MikuWindow extends JWindow {
         }
     }
 
+    private void showMenu(MouseEvent e) {
+        int popupX = e.getX();
+        int popupY = e.getY();
+        
+        Dimension menuSize = popupMenu.getPreferredSize();
+        int menuWidth = menuSize.width;
+        int menuHeight = menuSize.height;
+        
+        int screenCursorX = miku.getX() + popupX;
+        int screenCursorY = miku.getY() + popupY;
+        
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        
+        if (screenCursorX + menuWidth > screenSize.width) {
+            popupX = popupX - menuWidth;
+        }
+        
+        if (screenCursorY + menuHeight > screenSize.height) {
+            popupY = popupY - menuHeight;
+        }
+        
+        popupMenu.show(e.getComponent(), popupX, popupY);
+    }
+
     private void setupMouseEvents() {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    if (System.currentTimeMillis() - lastPopupCloseTime > 150) {
+                        showMenu(e);
+                    }
+                    return; 
+                }
+
                 if (SwingUtilities.isLeftMouseButton(e)) {
+                    isLeftMouseDown = true; // Ghi nhận là ngón tay đang đè chuột trái
+                    
                     miku.setState(CharacterState.DRAGGING);
-                    initialClick = e.getPoint();
+                    
+                    int newWidth = miku.getWidth();
+                    Point screenPos = e.getLocationOnScreen();
+                    
+                    int grabX = newWidth / 2;
+                    int grabY = 50; 
+                    
+                    miku.setX(screenPos.x - grabX);
+                    miku.setY(screenPos.y - grabY);
+                    
+                    syncBounds(); 
+                    initialClick = new Point(grabX, grabY);
                 }
             }
 
             @Override
             public void mouseReleased(MouseEvent e) {
                 if (SwingUtilities.isLeftMouseButton(e)) {
+                    isLeftMouseDown = false; // Ghi nhận là ngón tay đã thả ra
+                    
                     if (miku.getState() == CharacterState.DRAGGING) {
-                        miku.setState(CharacterState.FALLING);
+                        if (!popupMenu.isVisible()) {
+                            miku.setState(CharacterState.FALLING);
+                        }
                     }
-                } else if (SwingUtilities.isRightMouseButton(e)) {
-                    // CẬP NHẬT: Kiểm tra khoảng thời gian.
-                    // Nếu thời gian từ lúc đóng Menu đến lúc thả chuột quá ngắn (< 150 mili-giây)
-                    // thì từ chối mở lại Menu (để Menu được đóng hẳn).
-                    if (System.currentTimeMillis() - lastPopupCloseTime > 150) {
-                        popupMenu.show(e.getComponent(), e.getX(), e.getY());
-                    }
-                }
+                } 
             }
         });
 
@@ -132,6 +184,13 @@ public class MikuWindow extends JWindow {
             @Override
             public void mouseDragged(MouseEvent e) {
                 if (miku.getState() == CharacterState.DRAGGING) {
+                    
+                    // 👉 TỰ ĐỘNG TẮT MENU:
+                    // Nếu bạn tiếp tục kéo Miku đi nơi khác, Menu sẽ bị đóng ngay lập tức!
+                    if (popupMenu.isVisible()) {
+                        popupMenu.setVisible(false);
+                    }
+                    
                     Point screenLocation = e.getLocationOnScreen();
                     int newX = screenLocation.x - initialClick.x;
                     int newY = screenLocation.y - initialClick.y;
