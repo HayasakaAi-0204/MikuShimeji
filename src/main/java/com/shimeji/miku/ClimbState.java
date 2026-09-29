@@ -9,7 +9,6 @@ public class ClimbState implements MikuState {
     private boolean isClimbingUp; 
     private boolean isResting; 
 
-    // Thông số căn lề bám tường (5 là mức bạn đã thấy hợp lý)
     private static final int WALL_OFFSET = 5; 
 
     public ClimbState(boolean isLeftWall, boolean isClimbingUp) {
@@ -31,11 +30,9 @@ public class ClimbState implements MikuState {
     @Override
     public void enter(MikuCharacter miku) {
         if (isResting) {
-            // Bị kéo vào tường -> Bám tường 1-2s
             timer = getRandomTicks(1, 2);
             frameIndex = (int) (Math.random() * ResourceManager.TOTAL_CLIMB_FRAMES);
         } else {
-            // Đi bộ chạm tường -> Leo lên 5-7s
             timer = getRandomTicks(5, 7);
             isClimbingUp = true;
             frameIndex = 0;
@@ -50,9 +47,7 @@ public class ClimbState implements MikuState {
         }
     }
 
-    // Hàm phụ trợ để xử lý rơi (áp dụng cho cả rơi ngẫu nhiên và rơi do đụng trần)
     private void fallDown(MikuCharacter miku) {
-        // Đẩy nhẹ Miku ra khỏi tường 5 pixel để không bị nam châm kéo dính lại vào tường
         if (isLeftWall) {
             miku.setX(-miku.getSidePadding() + 5); 
         } else {
@@ -64,10 +59,14 @@ public class ClimbState implements MikuState {
 
     private void decideNextAction(MikuCharacter miku) {
         double chance = Math.random(); 
+        boolean isGaming = (miku.getAppMode() == MikuCharacter.AppMode.GAMING);
         
         if (isResting) {
-            // Sau khi BÁM TƯỜNG: 10% rơi, 30% bám tiếp 1-2s, 30% lên 2-4s, 30% xuống 2-4s
-            if (chance < 0.10) { 
+            // 👉 BÌNH THƯỜNG: 10% rơi, 30% bám tiếp, 30% lên, 30% xuống
+            // 👉 GAMING: 0% rơi, 40% bám tiếp, 30% lên, 30% xuống
+            double fallThreshold = isGaming ? 0.0 : 0.10;
+            
+            if (chance < fallThreshold) { 
                 fallDown(miku);
             } else if (chance < 0.40) { 
                 isResting = true;
@@ -85,10 +84,14 @@ public class ClimbState implements MikuState {
             }
         } 
         else if (isClimbingUp) {
-            // Sau khi LEO LÊN: 10% rơi, 30% lên tiếp 2-4s, 60% bám tường 1-2s
-            if (chance < 0.10) {
+            // 👉 BÌNH THƯỜNG: 10% rơi, 30% lên tiếp, 60% bám tường
+            // 👉 GAMING: 0% rơi, 30% lên tiếp, 70% bám tường
+            double fallThreshold = isGaming ? 0.0 : 0.10;
+            double upThreshold = isGaming ? 0.30 : 0.40; 
+            
+            if (chance < fallThreshold) {
                 fallDown(miku);
-            } else if (chance < 0.40) {
+            } else if (chance < upThreshold) {
                 isResting = false;
                 isClimbingUp = true;
                 timer = getRandomTicks(2, 4);
@@ -98,10 +101,14 @@ public class ClimbState implements MikuState {
             }
         } 
         else {
-            // Sau khi LEO XUỐNG: 10% rơi, 30% xuống tiếp 2-4s, 60% bám tường 1-2s
-            if (chance < 0.10) {
+            // 👉 BÌNH THƯỜNG: 10% rơi, 30% xuống tiếp, 60% bám tường
+            // 👉 GAMING: 0% rơi, 30% xuống tiếp, 70% bám tường
+            double fallThreshold = isGaming ? 0.0 : 0.10;
+            double downThreshold = isGaming ? 0.30 : 0.40;
+            
+            if (chance < fallThreshold) {
                 fallDown(miku);
-            } else if (chance < 0.40) {
+            } else if (chance < downThreshold) {
                 isResting = false;
                 isClimbingUp = false;
                 timer = getRandomTicks(2, 4);
@@ -125,19 +132,33 @@ public class ClimbState implements MikuState {
         }
 
         int climbSpeed = miku.getSpeed() / 2; 
+        boolean isGaming = (miku.getAppMode() == MikuCharacter.AppMode.GAMING);
 
         if (isClimbingUp) {
             miku.setY(miku.getY() - climbSpeed); 
-            // 👉 THAY ĐỔI TẠI ĐÂY: Đụng nóc trần nhà -> Rớt thẳng xuống đất!
+            // 👉 NGĂN RỚT KHI ĐỤNG TRẦN Ở GAMING MODE
             if (miku.getY() <= 0) {
-                fallDown(miku);
+                if (isGaming) {
+                    miku.setY(0);
+                    isResting = true;
+                    timer = getRandomTicks(1, 2);
+                } else {
+                    fallDown(miku);
+                }
                 return;
             }
         } else {
             miku.setY(miku.getY() + climbSpeed); 
+            // 👉 NGĂN RỚT KHI ĐỤNG SÀN Ở GAMING MODE
             if (miku.getY() >= floorY) {
-                miku.setY(floorY);
-                miku.changeState(new IdleState());
+                if (isGaming) {
+                    miku.setY(floorY);
+                    isResting = true;
+                    timer = getRandomTicks(1, 2);
+                } else {
+                    miku.setY(floorY);
+                    miku.changeState(new IdleState());
+                }
                 return;
             }
         }
