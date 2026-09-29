@@ -25,6 +25,7 @@
 
   <build>
     <plugins>
+      <!-- 1. Plugin đóng gói file JAR -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
@@ -33,13 +34,46 @@
           <archive>
             <manifest>
               <addClasspath>true</addClasspath>
-              <!-- Đây là dòng chỉ định file App.java làm file khởi động -->
               <mainClass>com.shimeji.miku.App</mainClass>
             </manifest>
           </archive>
         </configuration>
       </plugin>
+
+      <!-- 2. Plugin biến JAR thành EXE và gắn Icon -->
+      <plugin>
+        <groupId>com.akathist.maven.plugins.launch4j</groupId>
+        <artifactId>launch4j-maven-plugin</artifactId>
+        <version>2.5.2</version>
+        <executions>
+          <execution>
+            <id>l4j-clui</id>
+            <phase>package</phase>
+            <goals>
+              <goal>launch4j</goal>
+            </goals>
+            <configuration>
+              <!-- Chế độ gui: Khi chạy sẽ không bị hiện cửa sổ đen (CMD) ở nền -->
+              <headerType>gui</headerType> 
+              <!-- Tên file exe đầu ra -->
+              <outfile>${project.build.directory}/${project.artifactId}.exe</outfile>
+              <jar>${project.build.directory}/${project.artifactId}-${project.version}.jar</jar>
+              <errTitle>Miku Shimeji Error</errTitle>
+              <classPath>
+                <mainClass>com.shimeji.miku.App</mainClass>
+              </classPath>
+              <!-- ĐƯỜNG DẪN TỚI FILE ICON CỦA BẠN -->
+              <icon>src/main/resources/images/miku_icon.ico</icon>
+              <jre>
+                <!-- Tự động tìm thư mục "jre" mọc ngay cạnh file exe. 
+                     Nếu không có, nó mới tự tìm Java trên máy tính. -->
+                <path>jre</path> 
+                <minVersion>1.8.0</minVersion>
+              </jre>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
-  
 </project>
