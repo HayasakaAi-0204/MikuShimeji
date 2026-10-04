@@ -1,3 +1,4 @@
+// File 2: MikuWindow.java
 package com.shimeji.miku;
 
 import javax.swing.*;
@@ -12,20 +13,22 @@ public class MikuWindow extends JWindow {
     private Point initialClick;
     private JPopupMenu popupMenu;
     private JPanel renderPanel;
-
     private long lastPopupCloseTime = 0;
-    private boolean isLeftMouseDown = false; // 👉 THÊM MỚI: Biến cảm nhận ngón tay đang đè chuột trái
+    private boolean isLeftMouseDown = false;
 
     public MikuWindow(MikuCharacter miku) {
         this.miku = miku;
         this.initialClick = new Point();
-
         setupWindow();
         setupMenu();
         setupMouseEvents();
     }
 
     private void setupWindow() {
+        // 👉 NGĂN CHẶN WINDOWS 11 ẢO TƯỞNG SỨC MẠNH:
+        // Gắn mác Cửa sổ Tiện ích để Windows không bao giờ giấu Taskbar nữa!
+        setType(Window.Type.UTILITY);
+
         setAlwaysOnTop(true);
         setFocusableWindowState(false);
         setBackground(new Color(0, 0, 0, 0));
@@ -50,10 +53,7 @@ public class MikuWindow extends JWindow {
         feature2.setEnabled(false);
 
         JMenuItem throwAction = new JMenuItem("Ném hành (Throw Leek)");
-        throwAction.addActionListener(e -> {
-            miku.setState(CharacterState.THROWING);
-        });
-
+        throwAction.addActionListener(e -> miku.setState(CharacterState.THROWING));
         JMenuItem exitItem = new JMenuItem("Thoát (Dismiss)");
         exitItem.addActionListener(e -> System.exit(0));
 
@@ -75,12 +75,8 @@ public class MikuWindow extends JWindow {
                 miku.setPaused(false);
                 lastPopupCloseTime = System.currentTimeMillis();
                 setAlwaysOnTop(true);
-
-                // 👉 SỬA LỖI TUỘT TAY:
-                // Khi tắt Menu, CHỈ cho Miku rơi xuống nếu bạn KHÔNG CÒN giữ chuột trái!
-                if (miku.getState() == CharacterState.DRAGGING && !isLeftMouseDown) {
+                if (miku.getState() == CharacterState.DRAGGING && !isLeftMouseDown)
                     miku.setState(CharacterState.FALLING);
-                }
             }
 
             @Override
@@ -88,10 +84,8 @@ public class MikuWindow extends JWindow {
                 miku.setPaused(false);
                 lastPopupCloseTime = System.currentTimeMillis();
                 setAlwaysOnTop(true);
-
-                if (miku.getState() == CharacterState.DRAGGING && !isLeftMouseDown) {
+                if (miku.getState() == CharacterState.DRAGGING && !isLeftMouseDown)
                     miku.setState(CharacterState.FALLING);
-                }
             }
         });
     }
@@ -100,39 +94,65 @@ public class MikuWindow extends JWindow {
         BufferedImage img = miku.getCurrentImage();
         if (img == null)
             return;
-
         int w = miku.getWidth();
         int h = miku.getHeight();
         Graphics2D g2d = (Graphics2D) g;
 
-        if (miku.isFacingRight()) {
+        // 👉 Đảm bảo điểm ảnh vuông vức sắc nét kể cả khi zoom x10
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+
+        if (miku.isFacingRight())
             g2d.drawImage(img, w, 0, -w, h, null);
-        } else {
+        else
             g2d.drawImage(img, 0, 0, w, h, null);
+
+        String countdown = miku.getCountdownText();
+        if (countdown != null) {
+
+            // 👉 ÉP BUỘC: CHỈ VẼ ĐỒNG HỒ TRÊN ĐẦU NẾU LÀ MIKU NHỎ
+            if (miku.getScale() <= 1.0) {
+                int fontSize = (int) (16 * Math.max(1.0, miku.getScale() * 0.4));
+                g2d.setFont(new Font("Arial", Font.BOLD, fontSize));
+                FontMetrics fm = g2d.getFontMetrics();
+                int tx = (miku.getWidth() - fm.stringWidth(countdown)) / 2;
+                int ty = (int) (30 * miku.getScale());
+
+                if (miku.isClimbing()) {
+                    if (miku.isFacingRight()) {
+                        tx += (int) (60 * miku.getScale());
+                    } else {
+                        tx += (int) (-60 * miku.getScale());
+                    }
+                } else {
+                    if (miku.isFacingRight()) {
+                        tx += (int) (0 * miku.getScale());
+                    } else {
+                        tx += (int) (0 * miku.getScale());
+                    }
+                }
+                ty += (int) (0 * miku.getScale());
+
+                g2d.setColor(new Color(255, 255, 255, 200));
+                g2d.fillRoundRect(tx - 5, ty - fm.getAscent() - 5, fm.stringWidth(countdown) + 10, fm.getHeight() + 10,
+                        10, 10);
+                g2d.setColor(Color.RED);
+                g2d.drawString(countdown, tx, ty);
+            }
         }
     }
 
     private void showMenu(MouseEvent e) {
         int popupX = e.getX();
         int popupY = e.getY();
-
         Dimension menuSize = popupMenu.getPreferredSize();
-        int menuWidth = menuSize.width;
-        int menuHeight = menuSize.height;
-
         int screenCursorX = miku.getX() + popupX;
         int screenCursorY = miku.getY() + popupY;
-
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
 
-        if (screenCursorX + menuWidth > screenSize.width) {
-            popupX = popupX - menuWidth;
-        }
-
-        if (screenCursorY + menuHeight > screenSize.height) {
-            popupY = popupY - menuHeight;
-        }
-
+        if (screenCursorX + menuSize.width > screenSize.width)
+            popupX = popupX - menuSize.width;
+        if (screenCursorY + menuSize.height > screenSize.height)
+            popupY = popupY - menuSize.height;
         popupMenu.show(e.getComponent(), popupX, popupY);
     }
 
@@ -140,40 +160,35 @@ public class MikuWindow extends JWindow {
         addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                // 👉 ĐÃ THÊM MỚI: Né đòn Click chuột trong Gaming Mode
                 if (miku.getAppMode() == MikuCharacter.AppMode.GAMING) {
-                    // Dù click trái hay phải, lập tức bốc hơi sang bờ tường đối diện!
-                    int screenWidth = miku.getScreenWidth();
-                    if (miku.getX() < screenWidth / 2) {
+                    if (miku.getX() < miku.getScreenWidth() / 2)
                         miku.changeState(new ClimbState(false, false, true));
-                    } else {
+                    else
                         miku.changeState(new ClimbState(true, false, true));
-                    }
-                    return; // Block lệnh click, không mở Menu hay Drag gì cả!
+                    return;
                 }
 
-                // --- PHẦN CODE CŨ (ĐƯỢC GIỮ NGUYÊN) ---
+                // Khóa chuột lúc đang đi làm nhiệm vụ
+                if (miku.isForcedPomodoroWalk()) {
+                    return;
+                }
+
                 if (SwingUtilities.isRightMouseButton(e)) {
-                    if (System.currentTimeMillis() - lastPopupCloseTime > 150) {
+                    if (System.currentTimeMillis() - lastPopupCloseTime > 150)
                         showMenu(e);
-                    }
                     return;
                 }
 
                 if (SwingUtilities.isLeftMouseButton(e)) {
-                    isLeftMouseDown = true; // Ghi nhận là ngón tay đang đè chuột trái
-
+                    isLeftMouseDown = true;
                     miku.setState(CharacterState.DRAGGING);
 
-                    int newWidth = miku.getWidth();
-                    Point screenPos = e.getLocationOnScreen();
+                    int grabX = miku.getWidth() / 2;
+                    // 👉 Chuột luôn nằm ở bụng nhân vật
+                    int grabY = miku.getHeight() / 2;
 
-                    int grabX = newWidth / 2;
-                    int grabY = 50;
-
-                    miku.setX(screenPos.x - grabX);
-                    miku.setY(screenPos.y - grabY);
-
+                    miku.setX(e.getLocationOnScreen().x - grabX);
+                    miku.setY(e.getLocationOnScreen().y - grabY);
                     syncBounds();
                     initialClick = new Point(grabX, grabY);
                 }
@@ -182,36 +197,46 @@ public class MikuWindow extends JWindow {
             @Override
             public void mouseReleased(MouseEvent e) {
                 if (SwingUtilities.isLeftMouseButton(e)) {
-                    isLeftMouseDown = false; // Ghi nhận là ngón tay đã thả ra
-
-                    if (miku.getState() == CharacterState.DRAGGING) {
-                        if (!popupMenu.isVisible()) {
-                            miku.setState(CharacterState.FALLING);
-                        }
+                    isLeftMouseDown = false;
+                    if (miku.getState() == CharacterState.DRAGGING && !popupMenu.isVisible()) {
+                        miku.setState(CharacterState.FALLING);
                     }
                 }
             }
         });
-
         addMouseMotionListener(new MouseAdapter() {
             @Override
             public void mouseDragged(MouseEvent e) {
                 if (miku.getState() == CharacterState.DRAGGING) {
-
-                    if (popupMenu.isVisible()) {
+                    if (popupMenu.isVisible())
                         popupMenu.setVisible(false);
-                    }
-
-                    Point screenLocation = e.getLocationOnScreen();
-                    int newX = screenLocation.x - initialClick.x;
-                    int newY = screenLocation.y - initialClick.y;
-                    miku.setPosition(newX, newY);
+                    miku.setPosition(e.getLocationOnScreen().x - initialClick.x,
+                            e.getLocationOnScreen().y - initialClick.y);
                 }
             }
         });
     }
 
     public void syncBounds() {
-        setBounds(miku.getX(), miku.getY(), miku.getWidth(), miku.getHeight());
+        int y = miku.getY();
+        int h = miku.getHeight();
+
+        // 👉 CẮT ĐUÔI CỬA SỔ: Chặn không cho khung hình tàng hình đè lên Taskbar
+        // Việc này sẽ chấm dứt việc Windows 11 lầm tưởng và đem giấu Taskbar đi!
+        try {
+            Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+            GraphicsConfiguration gc = getGraphicsConfiguration();
+            if (gc != null) {
+                Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(gc);
+                int taskbarTop = screenSize.height - insets.bottom;
+
+                if (y + h > taskbarTop) {
+                    h = Math.max(1, taskbarTop - y);
+                }
+            }
+        } catch (Exception e) {
+        }
+
+        setBounds(miku.getX(), y, miku.getWidth(), h);
     }
 }

@@ -7,14 +7,13 @@ public class WalkState implements MikuState {
     private int timer = 0;
     private boolean isLeft;
 
-    public WalkState(boolean isLeft) {
-        this.isLeft = isLeft;
-    }
+    public WalkState(boolean isLeft) { this.isLeft = isLeft; }
 
     @Override
     public void enter(MikuCharacter miku) {
         frameIndex = 0;
         timer = 150 + (int) (Math.random() * 300);
+        if (miku.getScale() > 1.0) timer += (int)(miku.getWidth() / miku.getSpeed()) + 150; 
         miku.setFacingRight(!isLeft);
     }
 
@@ -26,24 +25,32 @@ public class WalkState implements MikuState {
         miku.setX(newX);
         timer--;
 
-        int screenLimit = miku.getScreenWidth() - miku.getWidth() + miku.getSidePadding();
-        boolean isGaming = (miku.getAppMode() == MikuCharacter.AppMode.GAMING);
+        // 👉 TÍNH TOÁN BIÊN GIỚI TƯỜNG BÌNH THƯỜNG
+        int leftLimit = -miku.getSidePadding();
+        int rightLimit = miku.getScreenWidth() - miku.getWidth() + miku.getSidePadding();
+        
+        boolean isForcedWalk = (miku.getAppMode() == MikuCharacter.AppMode.GAMING) || miku.isForcedPomodoroWalk();
+        
+        // 👉 CẬP NHẬT: Ép Miku đi lọt thỏm 100% ra khỏi màn hình (khuất bóng) khi đi làm nhiệm vụ!
+        if (miku.isForcedPomodoroWalk()) {
+            leftLimit = -miku.getWidth();
+            rightLimit = miku.getScreenWidth();
+        }
         
         if (isLeft) {
-            // 👉 ĐÃ THAY ĐỔI: Nếu ở Gaming Mode, bỏ qua timer, phải đi tới khi đụng mép tường mới thôi
-            if (newX < -miku.getSidePadding() || (timer <= 0 && !isGaming)) {
-                if (newX < -miku.getSidePadding()) {
-                    miku.setX(-miku.getSidePadding());
-                    miku.changeState(new ClimbState(true, true)); // Leo lên
+            if (newX < leftLimit || (timer <= 0 && !isForcedWalk)) {
+                if (newX < leftLimit) {
+                    miku.setX(leftLimit);
+                    miku.changeState(new ClimbState(true, true));
                     return;
                 }
                 miku.changeState(new IdleState());
             }
         } else {
-            if (newX > screenLimit || (timer <= 0 && !isGaming)) {
-                if (newX > screenLimit) {
-                    miku.setX(screenLimit);
-                    miku.changeState(new ClimbState(false, true)); // Leo lên
+            if (newX > rightLimit || (timer <= 0 && !isForcedWalk)) {
+                if (newX > rightLimit) {
+                    miku.setX(rightLimit);
+                    miku.changeState(new ClimbState(false, true));
                     return;
                 }
                 miku.changeState(new IdleState());
@@ -52,12 +59,7 @@ public class WalkState implements MikuState {
     }
 
     @Override
-    public void updateAnimation(MikuCharacter miku) {
-        frameIndex = (frameIndex + 1) % ResourceManager.TOTAL_WALK_FRAMES;
-    }
-
+    public void updateAnimation(MikuCharacter miku) { frameIndex = (frameIndex + 1) % ResourceManager.TOTAL_WALK_FRAMES; }
     @Override
-    public BufferedImage getCurrentImage() {
-        return ResourceManager.getWalkImage(frameIndex);
-    }
+    public BufferedImage getCurrentImage() { return ResourceManager.getWalkImage(frameIndex); }
 }

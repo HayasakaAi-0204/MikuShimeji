@@ -24,6 +24,9 @@
   </dependencies>
 
   <build>
+    <!-- 👉 ĐÃ THÊM: Ép Maven đặt tên file đầu ra ngắn gọn -->
+    <finalName>MikuShimeji</finalName>
+    
     <plugins>
       <!-- 1. Plugin đóng gói file JAR -->
       <plugin>
@@ -57,7 +60,8 @@
               <headerType>gui</headerType> 
               <!-- Tên file exe đầu ra -->
               <outfile>${project.build.directory}/${project.artifactId}.exe</outfile>
-              <jar>${project.build.directory}/${project.artifactId}-${project.version}.jar</jar>
+              <!-- 👉 ĐÃ SỬA LẠI ĐƯỜNG DẪN KHỚP VỚI TÊN FILE JAR NGẮN GỌN -->
+              <jar>${project.build.directory}/${project.build.finalName}.jar</jar>
               <errTitle>Miku Shimeji Error</errTitle>
               <classPath>
                 <mainClass>com.shimeji.miku.App</mainClass>
@@ -65,8 +69,7 @@
               <!-- ĐƯỜNG DẪN TỚI FILE ICON CỦA BẠN -->
               <icon>src/main/resources/images/miku_icon.ico</icon>
               <jre>
-                <!-- Tự động tìm thư mục "jre" mọc ngay cạnh file exe. 
-                     Nếu không có, nó mới tự tìm Java trên máy tính. -->
+                <!-- Tự động tìm thư mục "jre" mọc ngay cạnh file exe. -->
                 <path>jre</path> 
                 <minVersion>1.8.0</minVersion>
               </jre>
