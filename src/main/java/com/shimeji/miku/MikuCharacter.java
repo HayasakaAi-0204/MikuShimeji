@@ -166,17 +166,21 @@ public class MikuCharacter {
         return currentState.getCurrentImage();
     }
 
+    private static final int BASE_HEIGHT = 150; // Khung xương gốc 150px
+
     public int getWidth() {
         BufferedImage currentImg = getCurrentImage();
-        if (currentImg != null)
-            this.width = (int) (currentImg.getWidth() * scale);
+        if (currentImg != null) {
+            double aspect = (double) currentImg.getWidth() / currentImg.getHeight();
+            this.width = (int) (BASE_HEIGHT * scale * aspect);
+        }
         return this.width;
     }
 
     public int getHeight() {
-        BufferedImage currentImg = getCurrentImage();
-        if (currentImg != null)
-            this.height = (int) (currentImg.getHeight() * scale);
+        if (getCurrentImage() != null) {
+            this.height = (int) (BASE_HEIGHT * scale);
+        }
         return this.height;
     }
 

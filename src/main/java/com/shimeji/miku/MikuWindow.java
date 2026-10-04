@@ -98,8 +98,9 @@ public class MikuWindow extends JWindow {
         int h = miku.getHeight();
         Graphics2D g2d = (Graphics2D) g;
 
-        // 👉 Đảm bảo điểm ảnh vuông vức sắc nét kể cả khi zoom x10
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        // 👉 Cân bằng hoàn hảo giữa MƯỢT MÀ và NHẸ MÁY
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         if (miku.isFacingRight())
             g2d.drawImage(img, w, 0, -w, h, null);

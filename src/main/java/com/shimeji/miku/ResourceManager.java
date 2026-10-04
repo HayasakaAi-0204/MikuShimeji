@@ -15,14 +15,14 @@ public class ResourceManager {
     public static final int TOTAL_DRAG_FRAMES = 12;
     public static final int TOTAL_FALL_FRAMES = 24;
     public static final int TOTAL_THROW_FRAMES = 212;
-    public static final int TOTAL_DELETE_FRAMES = 236; 
-    public static final int TOTAL_CLIMB_FRAMES = 32; 
+    public static final int TOTAL_DELETE_FRAMES = 236;
+    public static final int TOTAL_CLIMB_FRAMES = 32;
 
-    private static final int TARGET_HEIGHT = 150;
+    private static final int TARGET_HEIGHT = 720;
 
     // Giữ nguyên mức phóng to như bạn đang dùng
-    private static final int CLIMB_TARGET_HEIGHT = 175; 
-    private static final int CLIMB_PAUSE_TARGET_HEIGHT = 150; 
+    private static final int CLIMB_TARGET_HEIGHT = 840;
+    private static final int CLIMB_PAUSE_TARGET_HEIGHT = 720;
 
     private static BufferedImage imgPaused;
     private static BufferedImage imgClimbPause;
@@ -33,7 +33,7 @@ public class ResourceManager {
     private static BufferedImage[] imgFall = new BufferedImage[TOTAL_FALL_FRAMES];
     private static BufferedImage[] imgThrow = new BufferedImage[TOTAL_THROW_FRAMES];
     private static BufferedImage[] imgDelete = new BufferedImage[TOTAL_DELETE_FRAMES];
-    private static BufferedImage[] imgClimb = new BufferedImage[TOTAL_CLIMB_FRAMES]; 
+    private static BufferedImage[] imgClimb = new BufferedImage[TOTAL_CLIMB_FRAMES];
 
     private static BufferedImage imgLeek;
 
@@ -42,44 +42,42 @@ public class ResourceManager {
 
     public static void loadImages() {
         ImageIO.setUseCache(false);
-        int pausedCharacterHeight = 135; 
-        int shiftX = 0; 
-        int shiftY = -5; 
-
+        int pausedCharacterHeight = 648; // 135 * 4.8
+        int shiftX = 0;
+        int shiftY = -24; // -5 * 4.8
         BufferedImage tempImg = loadImageAndScale("miku_idle_pause.png", pausedCharacterHeight);
         BufferedImage referenceFrame = getIdleImage(0);
-        
+
         if (tempImg != null && referenceFrame != null) {
             imgPaused = new BufferedImage(referenceFrame.getWidth(), TARGET_HEIGHT, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = imgPaused.createGraphics();
-            
+
             int drawX = (referenceFrame.getWidth() - tempImg.getWidth()) / 2 + shiftX;
             int drawY = (TARGET_HEIGHT - tempImg.getHeight()) + shiftY;
-            
+
             g2d.drawImage(tempImg, drawX, drawY, null);
             g2d.dispose();
-            
+
             if (tempImg != imgPaused) {
                 tempImg.flush();
             }
         }
-
         imgLeek = loadFrame("leek.png", -1, -1);
-
         BufferedImage rawClimbPause = loadFrame("miku_climb_pause.png", -1, CLIMB_PAUSE_TARGET_HEIGHT);
-        BufferedImage referenceClimb = getClimbImage(0); 
-        
+        BufferedImage referenceClimb = getClimbImage(0);
+
         if (rawClimbPause != null && referenceClimb != null) {
-            imgClimbPause = new BufferedImage(referenceClimb.getWidth(), referenceClimb.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            imgClimbPause = new BufferedImage(referenceClimb.getWidth(), referenceClimb.getHeight(),
+                    BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = imgClimbPause.createGraphics();
-            
-            // Giữ đúng tham số bạn thấy hợp lý
-            int PAUSE_SHIFT_X = -50; 
+
+            // 👉 Tọa độ chuẩn cho 720p
+            int PAUSE_SHIFT_X = -240; // -50 * 4.8
             int PAUSE_SHIFT_Y = 0;
-            
+
             g2d.drawImage(rawClimbPause, PAUSE_SHIFT_X, PAUSE_SHIFT_Y, null);
             g2d.dispose();
-            
+
             if (rawClimbPause != imgClimbPause) {
                 rawClimbPause.flush();
             }
@@ -108,7 +106,7 @@ public class ResourceManager {
     public static BufferedImage getDeleteImage(int index) {
         if (imgDelete[index] == null) {
             BufferedImage raw = loadFrame("miku_delete/miku_delete_%04d.png", index + 1, TARGET_HEIGHT);
-            imgDelete[index] = flipImageHorizontal(raw); 
+            imgDelete[index] = flipImageHorizontal(raw);
         }
         return imgDelete[index];
     }
@@ -150,15 +148,16 @@ public class ResourceManager {
     }
 
     private static BufferedImage flipImageHorizontal(BufferedImage img) {
-        if (img == null) return null;
+        if (img == null)
+            return null;
         int w = img.getWidth();
         int h = img.getHeight();
         BufferedImage flipped = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = flipped.createGraphics();
         g.drawImage(img, w, 0, -w, h, null);
         g.dispose();
-        
-        img.flush(); 
+
+        img.flush();
         return flipped;
     }
 
@@ -172,10 +171,12 @@ public class ResourceManager {
         String fullPath = BASE_DIR + relativePath;
         try {
             URL url = ResourceManager.class.getResource(fullPath);
-            if (url == null) return null;
+            if (url == null)
+                return null;
 
             BufferedImage originalImage = ImageIO.read(url);
-            if (originalImage == null) return null;
+            if (originalImage == null)
+                return null;
 
             if (targetHeight == -1) {
                 BufferedImage cropped = autoCropAndFree(originalImage);
@@ -187,7 +188,8 @@ public class ResourceManager {
 
             int origWidth = originalImage.getWidth();
             int origHeight = originalImage.getHeight();
-            if (origHeight == targetHeight) return originalImage;
+            if (origHeight == targetHeight)
+                return originalImage;
 
             double ratio = (double) origWidth / origHeight;
             int targetWidth = (int) (targetHeight * ratio);
@@ -215,10 +217,14 @@ public class ResourceManager {
         for (int y = 0; y < source.getHeight(); y++) {
             for (int x = 0; x < source.getWidth(); x++) {
                 if (((source.getRGB(x, y) >> 24) & 0xff) > 0) {
-                    if (x < minX) minX = x;
-                    if (y < minY) minY = y;
-                    if (x > maxX) maxX = x;
-                    if (y > maxY) maxY = y;
+                    if (x < minX)
+                        minX = x;
+                    if (y < minY)
+                        minY = y;
+                    if (x > maxX)
+                        maxX = x;
+                    if (y > maxY)
+                        maxY = y;
                     found = true;
                 }
             }
