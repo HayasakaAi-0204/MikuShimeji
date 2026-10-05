@@ -1,6 +1,7 @@
 // File 1: App.java
 package com.shimeji.miku;
 
+import com.formdev.flatlaf.FlatDarkLaf; // 👉 Thêm dòng này lên nhóm import đầu file
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -12,6 +13,31 @@ public class App {
     private static final int ANIMATION_TICK_RATE = 24;
 
     public static void main(String[] args) {
+        try {
+            // 👉 BẮT BUỘC DÙNG PHÔNG CHỮ SEGOE UI CỦA MICROSOFT
+            UIManager.put("defaultFont", new Font("Segoe UI", Font.PLAIN, 13));
+
+            // 👉 NỚI RỘNG KHOẢNG CÁCH DÒNG CHO THOÁNG (CHUẨN FLUENT DESIGN)
+            UIManager.put("MenuItem.margin", new Insets(4, 8, 4, 8));
+            UIManager.put("CheckBoxMenuItem.margin", new Insets(4, 8, 4, 8));
+            // 👉 BẬT BỘ KHỬ RĂNG CƯA PHẦN CỨNG (CLEARTYPE) ĐỂ CHỮ NÉT CĂNG
+            System.setProperty("awt.useSystemAAFontSettings", "lcd");
+            System.setProperty("swing.aatext", "true");
+
+            // 👉 ÉP MÀU CHỮ THÀNH TRẮNG TINH (SÁNG RÕ GIỐNG WINDOWS)
+            UIManager.put("MenuItem.foreground", Color.WHITE);
+            UIManager.put("CheckBoxMenuItem.foreground", Color.WHITE);
+
+            // 👉 LÀM GIẢ HIỆU ỨNG KÍNH TRONG SUỐT (TRANSLUCENT) CỦA WINDOWS 11
+            UIManager.put("PopupMenu.background", new Color(35, 35, 35, 220)); // Nền đen pha độ đục 220
+            UIManager.put("MenuItem.background", new Color(0, 0, 0, 0)); // Làm trong suốt các dòng chữ
+            UIManager.put("CheckBoxMenuItem.background", new Color(0, 0, 0, 0));
+
+            // Kích hoạt giao diện
+            UIManager.setLookAndFeel(new FlatDarkLaf());
+        } catch (Exception e) {
+        }
+
         JPopupMenu.setDefaultLightWeightPopupEnabled(false);
         SwingUtilities.invokeLater(() -> startShimeji());
     }
@@ -194,5 +220,8 @@ public class App {
         } catch (AWTException e) {
             System.out.println("Lỗi: " + e.getMessage());
         }
+
+        // 👉 TRUYỀN MENU XỊN TỪ TASKBAR SANG CHO MIKU DÙNG CHUNG
+        window.setSharedMenu(swingPopup);
     }
 }

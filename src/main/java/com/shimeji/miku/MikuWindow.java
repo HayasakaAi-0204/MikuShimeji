@@ -20,7 +20,7 @@ public class MikuWindow extends JWindow {
         this.miku = miku;
         this.initialClick = new Point();
         setupWindow();
-        setupMenu();
+        // setupMenu();
         setupMouseEvents();
     }
 
@@ -44,30 +44,13 @@ public class MikuWindow extends JWindow {
         add(renderPanel);
     }
 
-    private void setupMenu() {
-        popupMenu = new JPopupMenu();
-
-        JMenuItem feature1 = new JMenuItem("Gọi thêm Miku (Call Another)");
-        JMenuItem feature2 = new JMenuItem("Đi theo chuột (Follow Cursor)");
-        feature1.setEnabled(false);
-        feature2.setEnabled(false);
-
-        JMenuItem throwAction = new JMenuItem("Ném hành (Throw Leek)");
-        throwAction.addActionListener(e -> miku.setState(CharacterState.THROWING));
-        JMenuItem exitItem = new JMenuItem("Thoát (Dismiss)");
-        exitItem.addActionListener(e -> System.exit(0));
-
-        popupMenu.add(throwAction);
-        popupMenu.addSeparator();
-        popupMenu.add(feature1);
-        popupMenu.add(feature2);
-        popupMenu.addSeparator();
-        popupMenu.add(exitItem);
-
-        popupMenu.addPopupMenuListener(new PopupMenuListener() {
+    // 👉 HÀM MỚI: NHẬN MENU TỪ TASKBAR VÀ GẮN CẢM BIẾN TẠM DỪNG MIKU
+    public void setSharedMenu(JPopupMenu sharedMenu) {
+        this.popupMenu = sharedMenu;
+        this.popupMenu.addPopupMenuListener(new PopupMenuListener() {
             @Override
             public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
-                miku.setPaused(true);
+                miku.setPaused(true); // Dừng di chuyển khi đang mở Menu
             }
 
             @Override
@@ -81,11 +64,7 @@ public class MikuWindow extends JWindow {
 
             @Override
             public void popupMenuCanceled(PopupMenuEvent e) {
-                miku.setPaused(false);
-                lastPopupCloseTime = System.currentTimeMillis();
-                setAlwaysOnTop(true);
-                if (miku.getState() == CharacterState.DRAGGING && !isLeftMouseDown)
-                    miku.setState(CharacterState.FALLING);
+                popupMenuWillBecomeInvisible(e);
             }
         });
     }
@@ -167,6 +146,8 @@ public class MikuWindow extends JWindow {
     }
 
     private void showMenu(MouseEvent e) {
+        if (popupMenu == null)
+            return; // 👉 Thêm dòng này để bảo vệ
         int popupX = e.getX();
         int popupY = e.getY();
         Dimension menuSize = popupMenu.getPreferredSize();

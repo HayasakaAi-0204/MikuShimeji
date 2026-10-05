@@ -21,6 +21,12 @@
       <version>3.8.1</version>
       <scope>test</scope>
     </dependency>
+        <!-- Thư viện giao diện FlatLaf hiện đại cho Java -->
+    <dependency>
+      <groupId>com.formdev</groupId>
+      <artifactId>flatlaf</artifactId>
+      <version>3.4.1</version>
+    </dependency>
   </dependencies>
 
   <build>
