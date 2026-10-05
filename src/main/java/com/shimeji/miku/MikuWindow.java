@@ -133,11 +133,35 @@ public class MikuWindow extends JWindow {
                 }
                 ty += (int) (0 * miku.getScale());
 
-                g2d.setColor(new Color(255, 255, 255, 200));
-                g2d.fillRoundRect(tx - 5, ty - fm.getAscent() - 5, fm.stringWidth(countdown) + 10, fm.getHeight() + 10,
-                        10, 10);
-                g2d.setColor(Color.RED);
-                g2d.drawString(countdown, tx, ty);
+                // 1. Tách chuỗi thời gian để kiểm tra xem còn dưới 5 giây không
+                boolean isUrgent = false;
+                try {
+                    String[] parts = countdown.split(":");
+                    int mins = Integer.parseInt(parts[0]);
+                    int secs = Integer.parseInt(parts[1]);
+                    if (mins == 0 && secs <= 5) {
+                        isUrgent = true;
+                    }
+                } catch (Exception ex) {
+                }
+
+                // 2. Thuật toán viền chữ tàng hình (xóa hoàn toàn nền trắng cũ)
+                java.awt.font.FontRenderContext frc = g2d.getFontRenderContext();
+                java.awt.font.TextLayout textLayout = new java.awt.font.TextLayout(countdown, g2d.getFont(), frc);
+                Shape outline = textLayout.getOutline(java.awt.geom.AffineTransform.getTranslateInstance(tx, ty));
+
+                // 3. Vẽ viền chữ màu đen (Viền mỏng 2.5px để cân đối với Miku nhỏ)
+                g2d.setColor(new Color(0, 0, 0, 200));
+                g2d.setStroke(new BasicStroke(2.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2d.draw(outline);
+
+                // 4. Tô màu ruột chữ
+                if (isUrgent) {
+                    g2d.setColor(new Color(255, 80, 80)); // Màu đỏ báo động khi <= 5s
+                } else {
+                    g2d.setColor(Color.WHITE); // Trắng thanh lịch khi bình thường
+                }
+                g2d.fill(outline);
             }
         }
     }
