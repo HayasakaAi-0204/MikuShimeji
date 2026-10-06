@@ -9,7 +9,15 @@ public class ProjectileWindow extends JWindow {
 
     public ProjectileWindow(Window owner, MikuCharacter miku) {
         super(owner, owner.getGraphicsConfiguration());
-        this.miku = miku; 
+        this.miku = miku;
+
+        // 👉 SỬA LỖI NỀN ĐEN: Ép FlatLaf không được coi cọng hành là Menu, và lột sạch
+        // màu nền!
+        setType(Window.Type.UTILITY);
+        getRootPane().setOpaque(false);
+        getRootPane().setBackground(new Color(0, 0, 0, 0));
+
+        // (Đây là các dòng cũ giữ nguyên)
         setAlwaysOnTop(true);
         setFocusableWindowState(false);
         setBackground(new Color(0, 0, 0, 0));
@@ -20,7 +28,8 @@ public class ProjectileWindow extends JWindow {
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
                 ThrowableItem item = miku.getEquippedItem();
-                if (item != null && item.isActive()) item.draw((Graphics2D) g);
+                if (item != null && item.isActive())
+                    item.draw((Graphics2D) g);
             }
         };
         panel.setOpaque(false);
@@ -31,13 +40,16 @@ public class ProjectileWindow extends JWindow {
     public void syncBounds() {
         ThrowableItem item = miku.getEquippedItem();
         if (item == null || !item.isActive()) {
-            if (isVisible()) setVisible(false);
+            if (isVisible())
+                setVisible(false);
             return;
         }
-        if (!isVisible()) setVisible(true);
+        if (!isVisible())
+            setVisible(true);
 
-        int scaledSize = (int)(BASE_WINDOW_SIZE * item.getScale());
-        if (getSize().width != scaledSize) setSize(scaledSize, scaledSize);
+        int scaledSize = (int) (BASE_WINDOW_SIZE * item.getScale());
+        if (getSize().width != scaledSize)
+            setSize(scaledSize, scaledSize);
         setLocation(item.getX() - scaledSize / 2, item.getY() - scaledSize / 2);
     }
 }

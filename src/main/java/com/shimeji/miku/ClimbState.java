@@ -6,10 +6,10 @@ public class ClimbState implements MikuState {
     private int frameIndex = 0;
     private int timer;
     private boolean isLeftWall;
-    private boolean isClimbingUp; 
-    private boolean isResting; 
+    private boolean isClimbingUp;
+    private boolean isResting;
 
-    private static final int WALL_OFFSET = 5; 
+    private static final int WALL_OFFSET = 12;
 
     public ClimbState(boolean isLeftWall, boolean isClimbingUp) {
         this(isLeftWall, isClimbingUp, false);
@@ -37,7 +37,7 @@ public class ClimbState implements MikuState {
             isClimbingUp = true;
             frameIndex = 0;
         }
-        
+
         miku.setFacingRight(!isLeftWall);
 
         if (isLeftWall) {
@@ -49,46 +49,45 @@ public class ClimbState implements MikuState {
 
     private void fallDown(MikuCharacter miku) {
         if (isLeftWall) {
-            miku.setX(-miku.getSidePadding() + 5); 
+            miku.setX(-miku.getSidePadding() - WALL_OFFSET);
         } else {
             int rightWall = miku.getScreenWidth() - miku.getWidth() + miku.getSidePadding();
-            miku.setX(rightWall - 5);
+            miku.setX(rightWall + WALL_OFFSET);
         }
         miku.changeState(new FallState());
     }
 
     private void decideNextAction(MikuCharacter miku) {
-        double chance = Math.random(); 
+        double chance = Math.random();
         boolean isGaming = (miku.getAppMode() == MikuCharacter.AppMode.GAMING);
-        
+
         if (isResting) {
             // 👉 BÌNH THƯỜNG: 10% rơi, 30% bám tiếp, 30% lên, 30% xuống
             // 👉 GAMING: 0% rơi, 40% bám tiếp, 30% lên, 30% xuống
             double fallThreshold = isGaming ? 0.0 : 0.10;
-            
-            if (chance < fallThreshold) { 
+
+            if (chance < fallThreshold) {
                 fallDown(miku);
-            } else if (chance < 0.40) { 
+            } else if (chance < 0.40) {
                 isResting = true;
                 timer = getRandomTicks(1, 2);
-            } else if (chance < 0.70) { 
+            } else if (chance < 0.70) {
                 isResting = false;
                 isClimbingUp = true;
                 timer = getRandomTicks(2, 4);
                 frameIndex = 0;
-            } else { 
+            } else {
                 isResting = false;
                 isClimbingUp = false;
                 timer = getRandomTicks(2, 4);
                 frameIndex = ResourceManager.TOTAL_CLIMB_FRAMES - 1;
             }
-        } 
-        else if (isClimbingUp) {
+        } else if (isClimbingUp) {
             // 👉 BÌNH THƯỜNG: 10% rơi, 30% lên tiếp, 60% bám tường
             // 👉 GAMING: 0% rơi, 30% lên tiếp, 70% bám tường
             double fallThreshold = isGaming ? 0.0 : 0.10;
-            double upThreshold = isGaming ? 0.30 : 0.40; 
-            
+            double upThreshold = isGaming ? 0.30 : 0.40;
+
             if (chance < fallThreshold) {
                 fallDown(miku);
             } else if (chance < upThreshold) {
@@ -99,13 +98,12 @@ public class ClimbState implements MikuState {
                 isResting = true;
                 timer = getRandomTicks(1, 2);
             }
-        } 
-        else {
+        } else {
             // 👉 BÌNH THƯỜNG: 10% rơi, 30% xuống tiếp, 60% bám tường
             // 👉 GAMING: 0% rơi, 30% xuống tiếp, 70% bám tường
             double fallThreshold = isGaming ? 0.0 : 0.10;
             double downThreshold = isGaming ? 0.30 : 0.40;
-            
+
             if (chance < fallThreshold) {
                 fallDown(miku);
             } else if (chance < downThreshold) {
@@ -128,14 +126,14 @@ public class ClimbState implements MikuState {
         }
 
         if (isResting) {
-            return; 
+            return;
         }
 
-        int climbSpeed = miku.getSpeed() / 2; 
+        int climbSpeed = miku.getSpeed() / 2;
         boolean isGaming = (miku.getAppMode() == MikuCharacter.AppMode.GAMING);
 
         if (isClimbingUp) {
-            miku.setY(miku.getY() - climbSpeed); 
+            miku.setY(miku.getY() - climbSpeed);
             // 👉 NGĂN RỚT KHI ĐỤNG TRẦN Ở GAMING MODE
             if (miku.getY() <= 0) {
                 if (isGaming) {
@@ -148,7 +146,7 @@ public class ClimbState implements MikuState {
                 return;
             }
         } else {
-            miku.setY(miku.getY() + climbSpeed); 
+            miku.setY(miku.getY() + climbSpeed);
             // 👉 NGĂN RỚT KHI ĐỤNG SÀN Ở GAMING MODE
             if (miku.getY() >= floorY) {
                 if (isGaming) {
@@ -166,7 +164,8 @@ public class ClimbState implements MikuState {
 
     @Override
     public void updateAnimation(MikuCharacter miku) {
-        if (isResting) return; 
+        if (isResting)
+            return;
 
         if (isClimbingUp) {
             frameIndex = (frameIndex + 1) % ResourceManager.TOTAL_CLIMB_FRAMES;

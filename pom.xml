@@ -10,8 +10,8 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.source>8</maven.compiler.source>
-    <maven.compiler.target>8</maven.compiler.target>
+    <maven.compiler.source>25</maven.compiler.source>
+    <maven.compiler.target>25</maven.compiler.target>
   </properties>
   
   <dependencies>
@@ -26,6 +26,12 @@
       <groupId>com.formdev</groupId>
       <artifactId>flatlaf</artifactId>
       <version>3.4.1</version>
+    </dependency>
+        <!-- Thư viện JLayer (MP3 SPI) giúp Java đọc và hát được file .mp3 -->
+    <dependency>
+      <groupId>com.googlecode.soundlibs</groupId>
+      <artifactId>mp3spi</artifactId>
+      <version>1.9.5.4</version>
     </dependency>
   </dependencies>
 
@@ -84,7 +90,9 @@
               <jre>
                 <!-- Tự động tìm thư mục "jre" mọc ngay cạnh file exe. -->
                 <path>jre</path> 
-                <minVersion>1.8.0</minVersion>
+                <minVersion>25</minVersion>
+                <initialHeapSize>64</initialHeapSize>
+                <maxHeapSize>1024</maxHeapSize>
               </jre>
             </configuration>
           </execution>

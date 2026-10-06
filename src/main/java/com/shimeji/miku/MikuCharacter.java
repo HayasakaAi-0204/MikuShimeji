@@ -172,14 +172,18 @@ public class MikuCharacter {
         BufferedImage currentImg = getCurrentImage();
         if (currentImg != null) {
             double aspect = (double) currentImg.getWidth() / currentImg.getHeight();
-            this.width = (int) (BASE_HEIGHT * scale * aspect);
+            // Lấy chiều cao thực tế nhân với tỷ lệ gốc để ra chiều rộng
+            this.width = (int) (this.getHeight() * aspect);
         }
         return this.width;
     }
 
     public int getHeight() {
-        if (getCurrentImage() != null) {
-            this.height = (int) (BASE_HEIGHT * scale);
+        BufferedImage currentImg = getCurrentImage();
+        if (currentImg != null) {
+            // Lấy chiều cao ảnh gốc chia cho 720px chuẩn để tính tỷ lệ bù trừ
+            double heightRatio = (double) currentImg.getHeight() / 720.0;
+            this.height = (int) (BASE_HEIGHT * scale * heightRatio);
         }
         return this.height;
     }

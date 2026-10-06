@@ -3,13 +3,13 @@ package com.shimeji.miku;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
 import java.net.URL;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import javax.imageio.ImageIO;
 
 public class ResourceManager {
-
     private static final String BASE_DIR = "/images/";
-
     public static final int TOTAL_IDLE_FRAMES = 240;
     public static final int TOTAL_WALK_FRAMES = 24;
     public static final int TOTAL_DRAG_FRAMES = 12;
@@ -18,24 +18,32 @@ public class ResourceManager {
     public static final int TOTAL_DELETE_FRAMES = 236;
     public static final int TOTAL_CLIMB_FRAMES = 32;
 
+    // Các thông số đồ họa 720p HD của bạn
     private static final int TARGET_HEIGHT = 720;
-
-    // Giữ nguyên mức phóng to như bạn đang dùng
     private static final int CLIMB_TARGET_HEIGHT = 840;
     private static final int CLIMB_PAUSE_TARGET_HEIGHT = 720;
 
     private static BufferedImage imgPaused;
     private static BufferedImage imgClimbPause;
-
-    private static BufferedImage[] imgIdle = new BufferedImage[TOTAL_IDLE_FRAMES];
-    private static BufferedImage[] imgWalk = new BufferedImage[TOTAL_WALK_FRAMES];
-    private static BufferedImage[] imgDrag = new BufferedImage[TOTAL_DRAG_FRAMES];
-    private static BufferedImage[] imgFall = new BufferedImage[TOTAL_FALL_FRAMES];
-    private static BufferedImage[] imgThrow = new BufferedImage[TOTAL_THROW_FRAMES];
-    private static BufferedImage[] imgDelete = new BufferedImage[TOTAL_DELETE_FRAMES];
-    private static BufferedImage[] imgClimb = new BufferedImage[TOTAL_CLIMB_FRAMES];
-
     private static BufferedImage imgLeek;
+
+    // 👉 ĐÂY LÀ TRÁI TIM CỦA CƠ CHẾ GIỚI HẠN RAM (LRU CACHE)
+    // Giới hạn 250 ảnh (Tương đương khóa cứng khoảng 400MB - 500MB RAM)
+    private static final int MAX_CACHE_SIZE = 250;
+    private static final Map<String, BufferedImage> frameCache = new LinkedHashMap<String, BufferedImage>(
+            MAX_CACHE_SIZE, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, BufferedImage> eldest) {
+            if (size() > MAX_CACHE_SIZE) {
+                // Giải phóng bộ nhớ của bức ảnh cũ nhất trước khi vứt nó ra khỏi hộp
+                if (eldest.getValue() != null) {
+                    eldest.getValue().flush();
+                }
+                return true;
+            }
+            return false;
+        }
+    };
 
     private ResourceManager() {
     }
@@ -71,8 +79,8 @@ public class ResourceManager {
                     BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = imgClimbPause.createGraphics();
 
-            // 👉 Tọa độ chuẩn cho 720p
-            int PAUSE_SHIFT_X = -240; // -50 * 4.8
+            // Tọa độ chuẩn cho 720p (Của riêng bạn)
+            int PAUSE_SHIFT_X = -200;
             int PAUSE_SHIFT_Y = 0;
 
             g2d.drawImage(rawClimbPause, PAUSE_SHIFT_X, PAUSE_SHIFT_Y, null);
@@ -84,11 +92,9 @@ public class ResourceManager {
         }
     }
 
+    // 👉 CÁC HÀM XUẤT ẢNH ĐÃ ĐƯỢC TỐI ƯU HÓA ĐỂ CHẠY QUA CACHE
     public static BufferedImage getClimbImage(int index) {
-        if (imgClimb[index] == null) {
-            imgClimb[index] = loadFrame("miku_climb/miku_climb_%04d.png", index + 1, CLIMB_TARGET_HEIGHT);
-        }
-        return imgClimb[index];
+        return loadCachedFrame("miku_climb/miku_climb_%04d.png", index, CLIMB_TARGET_HEIGHT, false);
     }
 
     public static BufferedImage getClimbPauseImage() {
@@ -96,47 +102,27 @@ public class ResourceManager {
     }
 
     public static BufferedImage getThrowImage(int index) {
-        if (imgThrow[index] == null) {
-            BufferedImage raw = loadFrame("miku_throw/miku_throw_%04d.png", index + 1, TARGET_HEIGHT);
-            imgThrow[index] = flipImageHorizontal(raw);
-        }
-        return imgThrow[index];
+        return loadCachedFrame("miku_throw/miku_throw_%04d.png", index, TARGET_HEIGHT, true);
     }
 
     public static BufferedImage getDeleteImage(int index) {
-        if (imgDelete[index] == null) {
-            BufferedImage raw = loadFrame("miku_delete/miku_delete_%04d.png", index + 1, TARGET_HEIGHT);
-            imgDelete[index] = flipImageHorizontal(raw);
-        }
-        return imgDelete[index];
+        return loadCachedFrame("miku_delete/miku_delete_%04d.png", index, TARGET_HEIGHT, true);
     }
 
     public static BufferedImage getIdleImage(int index) {
-        if (imgIdle[index] == null) {
-            imgIdle[index] = loadFrame("miku_idle/miku_idle_%04d.png", index + 1, TARGET_HEIGHT);
-        }
-        return imgIdle[index];
+        return loadCachedFrame("miku_idle/miku_idle_%04d.png", index, TARGET_HEIGHT, false);
     }
 
     public static BufferedImage getWalkImage(int index) {
-        if (imgWalk[index] == null) {
-            imgWalk[index] = loadFrame("miku_walk/miku_walk_%04d.png", index + 1, TARGET_HEIGHT);
-        }
-        return imgWalk[index];
+        return loadCachedFrame("miku_walk/miku_walk_%04d.png", index, TARGET_HEIGHT, false);
     }
 
     public static BufferedImage getDragImage(int index) {
-        if (imgDrag[index] == null) {
-            imgDrag[index] = loadFrame("miku_drag/miku_drag_%04d.png", index + 1, TARGET_HEIGHT);
-        }
-        return imgDrag[index];
+        return loadCachedFrame("miku_drag/miku_drag_%04d.png", index, TARGET_HEIGHT, false);
     }
 
     public static BufferedImage getFallImage(int index) {
-        if (imgFall[index] == null) {
-            imgFall[index] = loadFrame("miku_fall/miku_fall_%04d.png", index + 1, TARGET_HEIGHT);
-        }
-        return imgFall[index];
+        return loadCachedFrame("miku_fall/miku_fall_%04d.png", index, TARGET_HEIGHT, false);
     }
 
     public static BufferedImage getPausedImage() {
@@ -145,6 +131,30 @@ public class ResourceManager {
 
     public static BufferedImage getLeekImage() {
         return imgLeek;
+    }
+
+    // 👉 HÀM TẢI ẢNH TỰ ĐỘNG THU HỒI RÁC TRUNG TÂM
+    private static BufferedImage loadCachedFrame(String formatString, int index, int targetHeight, boolean flip) {
+        String relativePath = String.format(formatString, index + 1);
+        String cacheKey = relativePath + (flip ? "_flipped" : "");
+
+        // 1. Nếu ảnh đang có sẵn trong RAM thì lấy ra xài luôn
+        BufferedImage cachedImg = frameCache.get(cacheKey);
+        if (cachedImg != null) {
+            return cachedImg;
+        }
+
+        // 2. Nếu chưa có (hoặc đã bị thuật toán vứt đi vì quá lâu không dùng), thì tải
+        // lại từ ổ cứng
+        BufferedImage frame = loadImageAndScale(relativePath, targetHeight);
+        if (frame != null) {
+            if (flip) {
+                frame = flipImageHorizontal(frame);
+            }
+            frameCache.put(cacheKey, frame); // Nhét vào hộp Cache
+            return frame;
+        }
+        return imgPaused;
     }
 
     private static BufferedImage flipImageHorizontal(BufferedImage img) {

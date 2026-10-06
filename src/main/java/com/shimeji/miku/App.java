@@ -15,7 +15,7 @@ public class App {
     public static void main(String[] args) {
         try {
             // 👉 BẮT BUỘC DÙNG PHÔNG CHỮ SEGOE UI CỦA MICROSOFT
-            UIManager.put("defaultFont", new Font("Segoe UI", Font.PLAIN, 13));
+            UIManager.put("defaultFont", new Font("Dialog", Font.PLAIN, 13));
 
             // 👉 NỚI RỘNG KHOẢNG CÁCH DÒNG CHO THOÁNG (CHUẨN FLUENT DESIGN)
             UIManager.put("MenuItem.margin", new Insets(4, 8, 4, 8));
@@ -57,7 +57,9 @@ public class App {
         DesktopWatcher watcher = new DesktopWatcher(miku);
         watcher.startWatching();
 
-        setupSystemTray(miku, window);
+        // 👉 KHỞI ĐỘNG CỖ MÁY ÂM THANH
+        MusicPlayer musicPlayer = new MusicPlayer();
+        setupSystemTray(miku, window, musicPlayer); // Cập nhật để truyền máy phát nhạc vào Menu
 
         Timer physicsTimer = new Timer(PHYSICS_TICK_RATE, e -> {
             taskbarManager.update();
@@ -108,7 +110,7 @@ public class App {
         animationTimer.start();
     }
 
-    private static void setupSystemTray(MikuCharacter miku, MikuWindow window) {
+    private static void setupSystemTray(MikuCharacter miku, MikuWindow window, MusicPlayer musicPlayer) {
         if (!SystemTray.isSupported())
             return;
         SystemTray tray = SystemTray.getSystemTray();
@@ -144,7 +146,45 @@ public class App {
             workingItem.setSelected(true);
             miku.setAppMode(MikuCharacter.AppMode.WORKING);
         });
+        // 👉 TẠO CÁC NÚT ĐIỀU KHIỂN NHẠC
+        JMenuItem trackNameItem = new JMenuItem("🎵 Nhạc: Ngừng phát");
+        trackNameItem.setEnabled(false); // Làm mờ đi vì nó chỉ dùng để làm màn hình hiển thị chữ
 
+        JMenuItem playItem = new JMenuItem("▶ Phát / Tạm dừng");
+        JMenuItem nextItem = new JMenuItem("⏭ Chuyển bài kế tiếp");
+        // 👉 THÊM NÚT CHỌN THƯ MỤC
+        JMenuItem changeFolderItem = new JMenuItem("📂 Chọn thư mục nhạc...");
+
+        // Gán chức năng cho nút
+        playItem.addActionListener(e -> musicPlayer.togglePlayPause());
+        nextItem.addActionListener(e -> musicPlayer.next());
+
+        // Lệnh gọi cửa sổ Windows Native siêu mượt
+        changeFolderItem.addActionListener(e -> {
+            // Dùng cửa sổ File gốc của Windows thay vì JFileChooser
+            java.awt.FileDialog dialog = new java.awt.FileDialog((java.awt.Frame) null,
+                    "Mẹo: Hãy chọn 1 bài hát bất kỳ trong thư mục bạn muốn nạp",
+                    java.awt.FileDialog.LOAD);
+
+            dialog.setFile("*.mp3;*.wav"); // Chỉ hiển thị các file nhạc
+            dialog.setVisible(true); // Hiển thị cửa sổ
+
+            // Tự động suy ra thư mục gốc chứa bài hát bạn vừa chọn
+            String dir = dialog.getDirectory();
+            if (dir != null) {
+                musicPlayer.setMusicFolder(new java.io.File(dir));
+            }
+        });
+
+        // Nhét tất cả vào Menu
+        swingPopup.addSeparator();
+        swingPopup.add(trackNameItem);
+        swingPopup.add(playItem);
+        swingPopup.add(nextItem);
+        swingPopup.add(changeFolderItem); // 👉 NHỚ ADD THÊM NÚT NÀY VÀO MENU
+
+        // ... (Phần code cũ) JMenuItem throwItem = new JMenuItem("Ném hành (Throw
+        // Leek)");
         JMenuItem throwItem = new JMenuItem("Ném hành (Throw Leek)");
         throwItem.addActionListener(e -> miku.setState(CharacterState.THROWING));
         JMenuItem exitItem = new JMenuItem("Thoát (Dismiss)");
@@ -187,6 +227,8 @@ public class App {
         swingPopup.addPopupMenuListener(new PopupMenuListener() {
             @Override
             public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                // 👉 FIX LỖI MENU KHÔNG CHỊU TẮT: Kích hoạt cảm biến chuột
+                autoCloseTimer.start();
             }
 
             @Override
@@ -194,6 +236,7 @@ public class App {
                 hiddenDialog.setVisible(false);
             }
 
+            // ... (Các phần dưới giữ nguyên)
             @Override
             public void popupMenuCanceled(PopupMenuEvent e) {
                 hiddenDialog.setVisible(false);
@@ -221,6 +264,28 @@ public class App {
             System.out.println("Lỗi: " + e.getMessage());
         }
 
+        // 👉 CẢM BIẾN TỰ ĐỘNG CẬP NHẬT TÊN BÀI HÁT KHI MỞ MENU LÊN
+        // 👉 CẢM BIẾN TỰ ĐỘNG CẬP NHẬT TÊN BÀI HÁT KHI MỞ MENU LÊN
+        swingPopup.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
+            public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) {
+                // Cập nhật lại danh sách bài hát phòng khi có file mp3 mới
+                musicPlayer.scanMusic();
+
+                trackNameItem.setText("♪ " + musicPlayer.getCurrentTrackName());
+
+                // 👉 THÊM DÒNG NÀY: Cập nhật tên Thư mục trực tiếp lên nút Chọn
+                changeFolderItem.setText("📂 Chọn thư mục (Đang mở: " + musicPlayer.getMusicFolderName() + ")");
+            }
+
+            public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent e) {
+            }
+
+            // ...
+            public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) {
+            }
+        });
+
+        // window.setSharedMenu(swingPopup); // (Đây là dòng cũ bạn giữ nguyên)
         // 👉 TRUYỀN MENU XỊN TỪ TASKBAR SANG CHO MIKU DÙNG CHUNG
         window.setSharedMenu(swingPopup);
     }
