@@ -1,9 +1,9 @@
-// File: MikuMenu.java
 package com.shimeji.miku;
 
 import javax.swing.*;
 import java.awt.*;
 import java.net.URL;
+import java.util.prefs.Preferences;
 
 public class MikuMenu {
     // Các thuộc tính (Properties)
@@ -78,38 +78,87 @@ public class MikuMenu {
         JMenuItem trackNameItem = new JMenuItem("🎵 Nhạc: Ngừng phát");
         trackNameItem.setEnabled(false);
 
+        // ==========================================
+        // KHU VỰC ÂM LƯỢNG (ĐÃ CĂN CHỈNH THẲNG HÀNG)
+        // ==========================================
+        Color menuBg = swingPopup.getBackground(); // 👉 Lấy màu nền chuẩn của Menu
+
         JPanel volumePanel = new JPanel(new BorderLayout());
-        volumePanel.setOpaque(false);
+        volumePanel.setBackground(menuBg); // 👉 Khung chứa đóng vai trò làm "cục tẩy" xóa bóng ma
+
         JLabel volLabel = new JLabel(" 🔊 ");
         volLabel.setForeground(Color.WHITE);
-        JSlider volSlider = new JSlider(0, 100, 50);
-        volSlider.setOpaque(false);
+        volLabel.setPreferredSize(new Dimension(35, 20));
+
+        Preferences prefs = Preferences.userNodeForPackage(MikuMenu.class);
+        int savedVolume = prefs.getInt("mikuVolume", 50);
+
+        JSlider volSlider = new JSlider(0, 100, savedVolume);
+        volSlider.setOpaque(false); // 👉 TRẢ LẠI TRONG SUỐT CHO THANH TRƯỢT ĐỂ HIỆN THANH NGANG!
+        musicPlayer.setVolume(savedVolume / 100.0);
+
+        JLabel volValueLabel = new JLabel(savedVolume + "% ");
+        volValueLabel.setForeground(Color.WHITE);
+        volValueLabel.setPreferredSize(new Dimension(95, 20));
+        volValueLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+
         volumePanel.add(volLabel, BorderLayout.WEST);
         volumePanel.add(volSlider, BorderLayout.CENTER);
+        volumePanel.add(volValueLabel, BorderLayout.EAST);
 
         volSlider.addChangeListener(e -> {
-            musicPlayer.setVolume(volSlider.getValue() / 100.0);
+            int vol = volSlider.getValue();
+            musicPlayer.setVolume(vol / 100.0);
+            volValueLabel.setText(vol + "% ");
+            if (!volSlider.getValueIsAdjusting()) {
+                prefs.putInt("mikuVolume", vol);
+            }
         });
 
+        // ==========================================
+        // KHU VỰC TIẾN ĐỘ NHẠC (ĐÃ CĂN CHỈNH THẲNG HÀNG)
+        // ==========================================
         JPanel progressPanel = new JPanel(new BorderLayout());
-        progressPanel.setOpaque(false);
+        progressPanel.setBackground(menuBg); // 👉 Khung chứa đóng vai trò làm "cục tẩy" xóa bóng ma
+
         JLabel progLabel = new JLabel(" ⏳ ");
         progLabel.setForeground(Color.WHITE);
+        progLabel.setPreferredSize(new Dimension(35, 20));
+
         JSlider progSlider = new JSlider(0, 100, 0);
-        progSlider.setOpaque(false);
+        progSlider.setOpaque(false); // 👉 TRẢ LẠI TRONG SUỐT CHO THANH TRƯỢT ĐỂ HIỆN THANH NGANG!
+
+        JLabel progValueLabel = new JLabel("00:00 : 00:00 ");
+        progValueLabel.setForeground(Color.WHITE);
+        progValueLabel.setPreferredSize(new Dimension(95, 20));
+        progValueLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+
         progressPanel.add(progLabel, BorderLayout.WEST);
         progressPanel.add(progSlider, BorderLayout.CENTER);
+        progressPanel.add(progValueLabel, BorderLayout.EAST);
 
         progSlider.addChangeListener(e -> {
             if (progSlider.getValueIsAdjusting()) {
                 double total = musicPlayer.getTotalDurationSeconds();
-                musicPlayer.seek((progSlider.getValue() / 100.0) * total);
+                double current = (progSlider.getValue() / 100.0) * total;
+                musicPlayer.seek(current);
+
+                progValueLabel.setText(String.format("%02d:%02d : %02d:%02d ",
+                        (int) current / 60, (int) current % 60,
+                        (int) total / 60, (int) total % 60));
             }
         });
 
-        // 👉 BẮT BUỘC ĐỔI SANG JCheckBoxMenuItem THÌ BÙA CHÚ MỚI LINH NGHIỆM!
         JCheckBoxMenuItem playItem = new JCheckBoxMenuItem("▶ Phát / Tạm dừng");
+        JCheckBoxMenuItem prevItem = new JCheckBoxMenuItem("⏮ Chuyển bài trước");
         JCheckBoxMenuItem nextItem = new JCheckBoxMenuItem("⏭ Chuyển bài kế tiếp");
+
+        // 👉 THÊM ĐOẠN NÀY VÀO:
+        JCheckBoxMenuItem shuffleItem = new JCheckBoxMenuItem("🔀 Trộn bài", musicPlayer.isShuffle());
+        shuffleItem.addActionListener(e -> {
+            musicPlayer.setShuffle(shuffleItem.isSelected());
+            SwingUtilities.invokeLater(() -> swingPopup.repaint());
+        });
 
         // Nút chọn thư mục thì cứ để là JMenuItem thường vì bấm xong là phải đóng để
         // hiện cửa sổ
@@ -122,8 +171,24 @@ public class MikuMenu {
         });
 
         nextItem.addActionListener(e -> {
-            musicPlayer.next();
+            // 👉 BƯỚC ĐỆM: Xóa sạch bóng ma cũ ngay lập tức để chờ nạp bài mới
+            trackNameItem.setText("♪ Đang nạp nhạc...");
+            progSlider.setValue(0);
+            progValueLabel.setText("00:00 : 00:00 ");
+
+            musicPlayer.next(); // Bắt đầu load bài mới (mất 1-2 giây)
             nextItem.setSelected(false);
+            SwingUtilities.invokeLater(() -> swingPopup.repaint());
+        });
+
+        prevItem.addActionListener(e -> {
+            // 👉 BƯỚC ĐỆM: Xóa sạch bóng ma cũ ngay lập tức để chờ nạp bài mới
+            trackNameItem.setText("♪ Đang nạp nhạc...");
+            progSlider.setValue(0);
+            progValueLabel.setText("00:00 : 00:00 ");
+
+            musicPlayer.previous(); // Bắt đầu load bài mới (mất 1-2 giây)
+            prevItem.setSelected(false);
             SwingUtilities.invokeLater(() -> swingPopup.repaint());
         });
 
@@ -142,7 +207,10 @@ public class MikuMenu {
         JMenuItem throwItem = new JMenuItem("Ném hành (Throw Leek)");
         throwItem.addActionListener(e -> miku.setState(CharacterState.THROWING));
         JMenuItem exitItem = new JMenuItem("Thoát (Dismiss)");
-        exitItem.addActionListener(e -> System.exit(0));
+        exitItem.addActionListener(e -> {
+            musicPlayer.saveState(); // Ép lưu trước khi tắt
+            System.exit(0);
+        });
 
         /*
          * =============================================================================
@@ -161,6 +229,8 @@ public class MikuMenu {
          * progSlider : Thanh trượt tiến độ (Tua bài hát)
          * playItem : Nút Phát / Tạm dừng nhạc
          * nextItem : Nút Chuyển bài kế tiếp
+         * prevItem : Nút Chuyển bài trước đấy
+         * shuffleItem : Nút để bật lên thì bài hát kế tiếp là ngẫu nhiên
          * changeFolderItem : Nút Chọn thư mục nhạc (Gợi ý: Không nên cho vào vì nó cần
          * mở cửa sổ mới)
          * 
@@ -173,26 +243,49 @@ public class MikuMenu {
          */
 
         // 👉 DÙNG HÀM TIỆN ÍCH OOP MÀ CHÚNG TA VỪA LÀM
-        keepMenuOpen(playItem, nextItem, casualItem, gamingItem, workingItem, volSlider, progSlider);
+        keepMenuOpen(playItem, nextItem, casualItem, gamingItem, workingItem, volSlider, progSlider, prevItem,
+                shuffleItem);
 
-        swingPopup.addSeparator();
-        swingPopup.add(trackNameItem);
-        swingPopup.add(progressPanel);
-        swingPopup.add(volumePanel);
-        swingPopup.add(playItem);
-        swingPopup.add(nextItem);
-        swingPopup.add(changeFolderItem);
+        // ==========================================
+        // 1. TẠO CÁC DANH MỤC MẸ
+        // ==========================================
+        JMenu musicMenu = new JMenu("🎵 Phát nhạc");
+        JMenu modeMenu = new JMenu("⚙️ Chế độ");
+        JMenu actionMenu = new JMenu("🏃 Hành động");
 
-        swingPopup.addSeparator();
-        swingPopup.add(titleItem);
-        swingPopup.add(casualItem);
-        swingPopup.add(gamingItem);
-        swingPopup.add(workingItem);
+        // ==========================================
+        // 2. NHÉT CÁC NÚT VÀO TỪNG DANH MỤC
+        // ==========================================
 
-        swingPopup.addSeparator();
-        swingPopup.add(throwItem);
-        swingPopup.addSeparator();
-        swingPopup.add(exitItem);
+        // --- Danh mục: PHÁT NHẠC ---
+        musicMenu.add(trackNameItem);
+        musicMenu.add(progressPanel);
+        musicMenu.add(volumePanel);
+        musicMenu.addSeparator(); // Đường kẻ mờ phân cách
+        musicMenu.add(shuffleItem);
+        musicMenu.add(prevItem); // Lắp vào đây!
+        musicMenu.add(playItem);
+        musicMenu.add(nextItem);
+        musicMenu.add(changeFolderItem);
+
+        // --- Danh mục: CHẾ ĐỘ ---
+        modeMenu.add(titleItem); // Label "Chọn chế độ ---" của bạn
+        modeMenu.add(casualItem);
+        modeMenu.add(gamingItem);
+        modeMenu.add(workingItem);
+
+        // --- Danh mục: HÀNH ĐỘNG ---
+        actionMenu.add(throwItem); // Ném hành
+
+        // ==========================================
+        // 3. CUỐI CÙNG: GẮN 3 DANH MỤC NÀY VÀO MENU CHÍNH
+        // ==========================================
+        swingPopup.add(musicMenu);
+        swingPopup.add(modeMenu);
+        swingPopup.add(actionMenu);
+
+        swingPopup.addSeparator(); // Đường kẻ ngang cuối cùng
+        swingPopup.add(exitItem); // Nút Thoát
 
         JDialog hiddenDialog = new JDialog();
         hiddenDialog.setUndecorated(true);
@@ -213,7 +306,19 @@ public class MikuMenu {
                 Point mouse = MouseInfo.getPointerInfo().getLocation();
                 Point pLoc = swingPopup.getLocationOnScreen();
                 Dimension pSize = swingPopup.getSize();
+                // 1. Khởi tạo vùng an toàn cho Menu chính
                 Rectangle safeArea = new Rectangle(pLoc.x - 100, pLoc.y - 100, pSize.width + 200, pSize.height + 200);
+
+                // 2. 👉 Tự động dò tìm và cộng gộp vùng an toàn của TẤT CẢ các Menu con đang xổ
+                // ra
+                for (MenuElement el : MenuSelectionManager.defaultManager().getSelectedPath()) {
+                    Component c = el.getComponent();
+                    if (c != null && c.isShowing()) {
+                        Rectangle subRect = new Rectangle(c.getLocationOnScreen(), c.getSize());
+                        subRect.grow(100, 100); // Bơm thêm 100px "giáp bảo vệ" cho menu con
+                        safeArea = safeArea.union(subRect); // Dung hợp vào vùng an toàn gốc!
+                    }
+                }
 
                 int moveDist = Math.abs(mouse.x - startMouse[0].x) + Math.abs(mouse.y - startMouse[0].y);
 
@@ -282,6 +387,10 @@ public class MikuMenu {
                     double total = musicPlayer.getTotalDurationSeconds();
                     if (total > 0) {
                         progSlider.setValue((int) ((current / total) * 100));
+
+                        progValueLabel.setText(String.format("%02d:%02d : %02d:%02d ",
+                                (int) current / 60, (int) current % 60,
+                                (int) total / 60, (int) total % 60));
                     }
                 }
             });
@@ -290,7 +399,20 @@ public class MikuMenu {
         musicPlayer.setOnTrackChange(() -> {
             SwingUtilities.invokeLater(() -> {
                 trackNameItem.setText("♪ " + musicPlayer.getCurrentTrackName());
-                progSlider.setValue(0);
+
+                double current = musicPlayer.getCurrentTimeSeconds();
+                double total = musicPlayer.getTotalDurationSeconds();
+
+                if (total > 0) {
+                    if (current > total)
+                        current = 0;
+
+                    progSlider.setValue((int) ((current / total) * 100));
+
+                    progValueLabel.setText(String.format("%02d:%02d : %02d:%02d ",
+                            (int) current / 60, (int) current % 60,
+                            (int) total / 60, (int) total % 60));
+                }
             });
         });
 
