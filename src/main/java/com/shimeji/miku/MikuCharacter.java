@@ -80,20 +80,27 @@ public class MikuCharacter {
         }
 
         if (mode == AppMode.GAMING) {
-            this.pendingState = null;
-
-            // Nếu ẻm ĐANG bận rớt từ nóc nhà xuống, thì cứ để ẻm rớt phịch xuống đất.
-            // Cấm ép ẻm đu bám tường lúc đang ở trên trần nhà!
             if (!justShrunk) {
-                boolean isAirborne = (currentState instanceof FallState || currentState instanceof DragState
-                        || currentState instanceof ClimbState);
                 boolean isLeftWall = (this.x < screenWidth / 2);
-                if (isAirborne)
-                    changeState(new ClimbState(isLeftWall, false, true));
-                else
+
+                if (currentState instanceof FallState || currentState instanceof DragState) {
+                    // 👉 Đang rơi hoặc đang bị nắm đầu: Ghi nhớ lệnh "Chạm đất xong thì tự đi bộ ra
+                    // tường"
+                    this.pendingState = new WalkState(isLeftWall);
+                } else if (currentState instanceof ClimbState) {
+                    // 👉 Đang leo tường sẵn rồi thì xóa lịch trình, cứ yên vị ở đó
+                    this.pendingState = null;
+                } else {
+                    // 👉 Đang đứng dưới đất: Xóa lịch trình chờ và ép đi bộ ra vách tường ngay lập
+                    // tức
+                    this.pendingState = null;
                     changeState(new WalkState(isLeftWall));
+                }
+            } else {
+                this.pendingState = null;
             }
         } else {
+            // (Phần code cũ của các Mode khác giữ nguyên)
             if (currentState instanceof WalkState && !justShrunk)
                 changeState(new IdleState());
         }
@@ -182,7 +189,7 @@ public class MikuCharacter {
         BufferedImage currentImg = getCurrentImage();
         if (currentImg != null) {
             // Lấy chiều cao ảnh gốc chia cho 720px chuẩn để tính tỷ lệ bù trừ
-            double heightRatio = (double) currentImg.getHeight() / 720.0;
+            double heightRatio = (double) currentImg.getHeight() / 250.0;
             this.height = (int) (BASE_HEIGHT * scale * heightRatio);
         }
         return this.height;
@@ -410,6 +417,11 @@ public class MikuCharacter {
     }
 
     public void setPaused(boolean paused) {
+        // 👉 TRỊ DỨT ĐIỂM TRẠNG THÁI PAUSE TRONG GAMING MODE
+        if (paused && this.appMode == AppMode.GAMING) {
+            return; // Kháng lệnh! Nếu đang Gaming Mode thì từ chối không cho Pause!
+        }
+
         this.isPaused = paused;
         if (paused && (currentState instanceof ThrowState || currentState instanceof DeleteState)) {
             equippedItem.setInactive();

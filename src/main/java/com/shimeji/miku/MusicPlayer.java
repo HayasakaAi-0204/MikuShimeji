@@ -1,216 +1,187 @@
 package com.shimeji.miku;
 
-import javax.sound.sampled.*;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.util.Duration;
+
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.prefs.Preferences;
 
 public class MusicPlayer {
-    private File musicFolder;
     private List<File> playlist;
-    private int currentIndex = 0;
-
+    private int currentTrackIndex = 0;
+    private MediaPlayer mediaPlayer;
+    private File musicFolder;
+    private final Preferences prefs;
     private boolean isPlaying = false;
-    private boolean isPaused = false;
-    private boolean stopRequested = false;
-    private Thread playThread;
-    private SourceDataLine line;
 
-    private Preferences prefs;
+    // Cảm biến để báo cáo thời gian thực cho Thanh trượt giao diện
+    private Runnable onProgressUpdate;
+    private Runnable onTrackChange;
 
-    // Khởi tạo thư mục và quét nhạc
     public MusicPlayer() {
-        playlist = new ArrayList<>();
-        // Sử dụng Preferences để hệ thống tự động ghi nhớ thư mục bạn đã chọn
         prefs = Preferences.userNodeForPackage(MusicPlayer.class);
-
-        // Đọc đường dẫn đã lưu, nếu chưa có thì lấy mặc định là thư mục Music của
-        // Windows
-        String savedPath = prefs.get("MusicFolderPath",
-                new File(System.getProperty("user.home"), "Music").getAbsolutePath());
-        musicFolder = new File(savedPath);
-
-        scanMusic();
-    }
-
-    // 👉 HÀM MỚI ĐỂ ĐỔI THƯ MỤC NHẠC
-    public void setMusicFolder(File newFolder) {
-        if (newFolder != null && newFolder.isDirectory()) {
-            this.musicFolder = newFolder;
-            prefs.put("MusicFolderPath", newFolder.getAbsolutePath()); // Lưu lại cấu hình để Miku nhớ mãi mãi
+        playlist = new ArrayList<>();
+        String savedPath = prefs.get("musicFolderPath", null);
+        if (savedPath != null) {
+            musicFolder = new File(savedPath);
             scanMusic();
-            currentIndex = 0; // Đặt lại bài hát về bài đầu tiên
-            if (isPlaying) {
-                stop();
-                play(); // Đang hát thì tự động ngắt và phát luôn nhạc ở thư mục mới
+            if (!playlist.isEmpty()) {
+                prepareTrack(0);
             }
         }
+    }
+
+    public void setMusicFolder(File folder) {
+        if (folder != null && folder.exists() && folder.isDirectory()) {
+            this.musicFolder = folder;
+            prefs.put("musicFolderPath", folder.getAbsolutePath());
+            scanMusic();
+            if (mediaPlayer != null) {
+                mediaPlayer.stop();
+            }
+            if (!playlist.isEmpty()) {
+                prepareTrack(0);
+                play();
+            }
+        }
+    }
+
+    public String getMusicFolderName() {
+        return (musicFolder != null) ? musicFolder.getName() : "Chưa chọn";
     }
 
     public void scanMusic() {
         playlist.clear();
-        if (musicFolder.exists() && musicFolder.isDirectory()) {
+        if (musicFolder != null && musicFolder.exists()) {
             File[] files = musicFolder.listFiles((dir, name) -> {
                 String lower = name.toLowerCase();
-                return lower.endsWith(".mp3") || lower.endsWith(".wav");
+                return lower.endsWith(".mp3") || lower.endsWith(".wav"); // JavaFX chơi được cả WAV
             });
             if (files != null) {
-                playlist.addAll(Arrays.asList(files));
+                for (File f : files) {
+                    playlist.add(f);
+                }
             }
         }
+    }
+
+    private void prepareTrack(int index) {
+        if (playlist.isEmpty())
+            return;
+
+        if (mediaPlayer != null) {
+            mediaPlayer.stop();
+            mediaPlayer.dispose(); // Hủy bài cũ để giải phóng RAM
+        }
+
+        currentTrackIndex = index;
+        File file = playlist.get(currentTrackIndex);
+
+        // Biến đường dẫn file thành URL chuẩn cho JavaFX
+        Media media = new Media(file.toURI().toString());
+        mediaPlayer = new MediaPlayer(media);
+
+        // Tự động chuyển bài khi hết nhạc!
+        mediaPlayer.setOnEndOfMedia(this::next);
+
+        // Báo cáo cho giao diện biết bài hát đã sẵn sàng (để lấy độ dài)
+        mediaPlayer.setOnReady(() -> {
+            if (onTrackChange != null)
+                onTrackChange.run();
+        });
+
+        // Cảm biến nhịp đập: Liên tục báo cáo thời gian đang phát
+        mediaPlayer.currentTimeProperty().addListener((obs, oldTime, newTime) -> {
+            if (onProgressUpdate != null)
+                onProgressUpdate.run();
+        });
+
+        mediaPlayer.setVolume(0.5); // Mặc định âm lượng 50%
     }
 
     public void play() {
-        if (playlist.isEmpty())
-            return;
-
-        // 👉 SỬA BUG: Nếu đang ở cuối danh sách mà bấm Play thì quay vòng lại bài đầu
-        // tiên
-        if (currentIndex >= playlist.size()) {
-            currentIndex = 0;
+        if (mediaPlayer != null) {
+            mediaPlayer.play();
+            isPlaying = true;
+        } else if (!playlist.isEmpty()) {
+            prepareTrack(0);
+            mediaPlayer.play();
+            isPlaying = true;
         }
-
-        if (isPaused && line != null) {
-            // ... (Phần code cũ) // Đang tạm dừng thì phát tiếp (giữ nguyên vị trí bài hát)
-            isPaused = false;
-            line.start();
-            return;
-        }
-
-        if (isPlaying) {
-            stop(); // Nếu đang hát bài khác thì dừng bài cũ
-        }
-
-        isPlaying = true;
-        stopRequested = false;
-
-        // Mở luồng chạy ngầm để Miku không bị đứng hình khi hát
-        playThread = new Thread(() -> {
-            while (isPlaying && currentIndex < playlist.size() && !stopRequested) {
-                playFile(playlist.get(currentIndex));
-                if (!stopRequested) {
-                    currentIndex++; // Hát xong tự nhảy qua bài tiếp theo
-                }
-            }
-            isPlaying = false;
-        });
-        playThread.setDaemon(true);
-        playThread.start();
     }
 
     public void pause() {
-        if (isPlaying && !isPaused && line != null) {
-            isPaused = true;
-            line.stop(); // Tạm khóa họng, ngừng đẩy dữ liệu ra loa
-        }
-    }
-
-    public void stop() {
-        stopRequested = true;
-        isPaused = false;
-        if (line != null) {
-            line.stop();
-            line.close();
-        }
-        if (playThread != null) {
-            try {
-                playThread.join(500);
-            } catch (Exception e) {
-            }
-        }
-        isPlaying = false;
-    }
-
-    public void next() {
-        stop();
-        currentIndex++;
-        if (currentIndex >= playlist.size()) {
-            currentIndex = 0; // Quay lại bài số 1 nếu đã hết danh sách
-        }
-        play();
-    }
-
-    public void prev() {
-        stop();
-        currentIndex--;
-        if (currentIndex < 0) {
-            currentIndex = playlist.size() - 1; // Nhảy ngược về bài cuối cùng
-        }
-        play();
-    }
-
-    public String getCurrentTrackName() {
-        if (playlist.isEmpty())
-            return "Thư mục Music trống!";
-        if (currentIndex >= 0 && currentIndex < playlist.size()) {
-            return playlist.get(currentIndex).getName();
-        }
-        return "Unknown";
-    }
-
-    private void playFile(File file) {
-        try (AudioInputStream in = AudioSystem.getAudioInputStream(file)) {
-            AudioFormat baseFormat = in.getFormat();
-
-            // Ép giải mã MP3 sang định dạng chuẩn PCM (chưa nén) để loa có thể hiểu
-            AudioFormat decodedFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED,
-                    baseFormat.getSampleRate(),
-                    16,
-                    baseFormat.getChannels(),
-                    baseFormat.getChannels() * 2,
-                    baseFormat.getSampleRate(),
-                    false);
-
-            try (AudioInputStream din = AudioSystem.getAudioInputStream(decodedFormat, in)) {
-                DataLine.Info info = new DataLine.Info(SourceDataLine.class, decodedFormat);
-                line = (SourceDataLine) AudioSystem.getLine(info);
-                line.open(decodedFormat);
-                line.start();
-
-                byte[] data = new byte[4096];
-                int bytesRead = 0;
-
-                // Thuật toán Streaming: Vừa đọc ổ cứng vừa bắn ra loa liên tục từng đoạn 4KB
-                while (!stopRequested && bytesRead != -1) {
-                    if (isPaused) {
-                        Thread.sleep(100); // Ngủ đông khi bị Pause để tiết kiệm CPU
-                        continue;
-                    }
-                    bytesRead = din.read(data, 0, data.length);
-                    if (bytesRead >= 0) {
-                        line.write(data, 0, bytesRead);
-                    }
-                }
-
-                if (stopRequested) {
-                    line.flush(); // Nếu bị Next bài, xả bỏ bộ đệm ngay lập tức
-                } else {
-                    line.drain(); // Chờ phát cho hết nốt nhạc cuối cùng của bài hát
-                }
-
-                line.stop();
-                line.close();
-            }
-        } catch (Exception e) {
-            System.out.println("Lỗi phát nhạc bài " + file.getName() + ": " + e.getMessage());
+        if (mediaPlayer != null) {
+            mediaPlayer.pause();
+            isPlaying = false;
         }
     }
 
     public void togglePlayPause() {
-        if (isPlaying && !isPaused) {
+        if (isPlaying)
             pause();
-        } else {
+        else
             play();
+    }
+
+    public void next() {
+        if (playlist.isEmpty())
+            return;
+        int nextIndex = (currentTrackIndex + 1) % playlist.size();
+        prepareTrack(nextIndex);
+        if (isPlaying)
+            play();
+    }
+
+    public void previous() {
+        if (playlist.isEmpty())
+            return;
+        int prevIndex = (currentTrackIndex - 1 + playlist.size()) % playlist.size();
+        prepareTrack(prevIndex);
+        if (isPlaying)
+            play();
+    }
+
+    public String getCurrentTrackName() {
+        if (playlist.isEmpty())
+            return "Chưa có nhạc";
+        return playlist.get(currentTrackIndex).getName();
+    }
+
+    // 👇 CÁC VŨ KHÍ BÍ MẬT DÀNH CHO THANH TRƯỢT GIAO DIỆN (UI) 👇
+
+    public double getCurrentTimeSeconds() {
+        if (mediaPlayer == null)
+            return 0;
+        return mediaPlayer.getCurrentTime().toSeconds();
+    }
+
+    public double getTotalDurationSeconds() {
+        if (mediaPlayer == null || mediaPlayer.getMedia().getDuration().isUnknown())
+            return 100;
+        return mediaPlayer.getMedia().getDuration().toSeconds();
+    }
+
+    public void seek(double seconds) {
+        if (mediaPlayer != null) {
+            mediaPlayer.seek(Duration.seconds(seconds));
         }
     }
 
-    // 👉 HÀM LẤY TÊN THƯ MỤC ĐANG PHÁT
-    public String getMusicFolderName() {
-        if (musicFolder != null) {
-            return musicFolder.getName(); // Chỉ lấy tên thư mục ngắn gọn cho đẹp (VD: Nhac)
+    public void setVolume(double volume) {
+        if (mediaPlayer != null) {
+            mediaPlayer.setVolume(volume);
         }
-        return "Mặc định";
+    }
+
+    public void setOnProgressUpdate(Runnable onProgressUpdate) {
+        this.onProgressUpdate = onProgressUpdate;
+    }
+
+    public void setOnTrackChange(Runnable onTrackChange) {
+        this.onTrackChange = onTrackChange;
     }
 }

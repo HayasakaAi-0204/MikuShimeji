@@ -19,9 +19,9 @@ public class ResourceManager {
     public static final int TOTAL_CLIMB_FRAMES = 32;
 
     // Các thông số đồ họa 720p HD của bạn
-    private static final int TARGET_HEIGHT = 720;
-    private static final int CLIMB_TARGET_HEIGHT = 840;
-    private static final int CLIMB_PAUSE_TARGET_HEIGHT = 720;
+    private static final int TARGET_HEIGHT = 250;
+    private static final int CLIMB_TARGET_HEIGHT = 300;
+    private static final int CLIMB_PAUSE_TARGET_HEIGHT = 250;
 
     private static BufferedImage imgPaused;
     private static BufferedImage imgClimbPause;
@@ -29,7 +29,7 @@ public class ResourceManager {
 
     // 👉 ĐÂY LÀ TRÁI TIM CỦA CƠ CHẾ GIỚI HẠN RAM (LRU CACHE)
     // Giới hạn 250 ảnh (Tương đương khóa cứng khoảng 400MB - 500MB RAM)
-    private static final int MAX_CACHE_SIZE = 250;
+    private static final int MAX_CACHE_SIZE = 5000;
     private static final Map<String, BufferedImage> frameCache = new LinkedHashMap<String, BufferedImage>(
             MAX_CACHE_SIZE, 0.75f, true) {
         @Override
@@ -50,9 +50,9 @@ public class ResourceManager {
 
     public static void loadImages() {
         ImageIO.setUseCache(false);
-        int pausedCharacterHeight = 648; // 135 * 4.8
+        int pausedCharacterHeight = 225; // 135 * 4.8
         int shiftX = 0;
-        int shiftY = -24; // -5 * 4.8
+        int shiftY = -8; // -5 * 4.8
         BufferedImage tempImg = loadImageAndScale("miku_idle_pause.png", pausedCharacterHeight);
         BufferedImage referenceFrame = getIdleImage(0);
 
@@ -80,7 +80,7 @@ public class ResourceManager {
             Graphics2D g2d = imgClimbPause.createGraphics();
 
             // Tọa độ chuẩn cho 720p (Của riêng bạn)
-            int PAUSE_SHIFT_X = -200;
+            int PAUSE_SHIFT_X = -69;
             int PAUSE_SHIFT_Y = 0;
 
             g2d.drawImage(rawClimbPause, PAUSE_SHIFT_X, PAUSE_SHIFT_Y, null);

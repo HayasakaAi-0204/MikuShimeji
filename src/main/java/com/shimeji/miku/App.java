@@ -4,17 +4,22 @@ package com.shimeji.miku;
 import com.formdev.flatlaf.FlatDarkLaf; // 👉 Thêm dòng này lên nhóm import đầu file
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.*;
-import java.net.URL;
-import javax.swing.event.*;
 
 public class App {
     private static final int PHYSICS_TICK_RATE = 33;
     private static final int ANIMATION_TICK_RATE = 24;
 
     public static void main(String[] args) {
+        // 👉 ÉP ĐỘNG CƠ JAVA SỬ DỤNG CARD ĐỒ HỌA (GPU) ĐỂ XỬ LÝ ẢNH TRONG SUỐT, GIẢI
+        // CỨU CPU!
+        System.setProperty("sun.java2d.d3d", "true");
+        System.setProperty("sun.java2d.transaccel", "true");
         try {
-            // 👉 BẮT BUỘC DÙNG PHÔNG CHỮ SEGOE UI CỦA MICROSOFT
+            // 👉 KÍCH NỔ ĐỘNG CƠ JAVAFX ĐỂ CHẠY NHẠC
+            javafx.application.Platform.startup(() -> {
+            });
+
+            // 👉 BẮT BUỘC DÙNG PHÔNG CHỮ SEGOE UI...
             UIManager.put("defaultFont", new Font("Dialog", Font.PLAIN, 13));
 
             // 👉 NỚI RỘNG KHOẢNG CÁCH DÒNG CHO THOÁNG (CHUẨN FLUENT DESIGN)
@@ -59,7 +64,7 @@ public class App {
 
         // 👉 KHỞI ĐỘNG CỖ MÁY ÂM THANH
         MusicPlayer musicPlayer = new MusicPlayer();
-        setupSystemTray(miku, window, musicPlayer); // Cập nhật để truyền máy phát nhạc vào Menu
+        new MikuMenu(miku, window, musicPlayer);
 
         Timer physicsTimer = new Timer(PHYSICS_TICK_RATE, e -> {
             taskbarManager.update();
@@ -76,7 +81,11 @@ public class App {
             miku.updatePhysics(currentFloorY + feetOffset);
 
             if (miku.getAppMode() == MikuCharacter.AppMode.GAMING) {
-                if (miku.getState() != CharacterState.WALKING_LEFT) {
+                // 👉 LỌC NGHIÊM NGẶT NHẤT: Chỉ cho phép tự động né chuột khi đã yên vị bám trên
+                // vách tường (IDLE).
+                // Lúc đang Rơi hoặc đang Đi bộ lạch bạch dưới sàn, ẻm sẽ hoàn toàn phớt lờ con
+                // chuột!
+                if (miku.getState() == CharacterState.IDLE) {
                     Point mouse = MouseInfo.getPointerInfo().getLocation();
                     int dx = Math.abs(mouse.x - (miku.getX() + miku.getWidth() / 2));
                     int dy = Math.abs(mouse.y - (miku.getY() + miku.getHeight() / 2));
@@ -108,185 +117,12 @@ public class App {
 
         Timer animationTimer = new Timer(ANIMATION_TICK_RATE, e -> miku.updateAnimation());
         animationTimer.start();
+
+        Timer zOrderTimer = new Timer(2000, e -> {
+            window.setAlwaysOnTop(false);
+            window.setAlwaysOnTop(true);
+        });
+        zOrderTimer.start();
     }
 
-    private static void setupSystemTray(MikuCharacter miku, MikuWindow window, MusicPlayer musicPlayer) {
-        if (!SystemTray.isSupported())
-            return;
-        SystemTray tray = SystemTray.getSystemTray();
-        URL iconUrl = App.class.getResource("/images/miku_icon.png");
-        Image iconImage = Toolkit.getDefaultToolkit().getImage(iconUrl);
-        window.setIconImage(iconImage);
-
-        JPopupMenu swingPopup = new JPopupMenu();
-        JMenuItem titleItem = new JMenuItem("--- Chọn chế độ ---");
-        titleItem.setEnabled(false);
-
-        JCheckBoxMenuItem casualItem = new JCheckBoxMenuItem("Casual Mode", true);
-        JCheckBoxMenuItem gamingItem = new JCheckBoxMenuItem("Gaming Mode");
-        JCheckBoxMenuItem workingItem = new JCheckBoxMenuItem("Working Mode");
-
-        casualItem.addActionListener(e -> {
-            gamingItem.setSelected(false);
-            workingItem.setSelected(false);
-            casualItem.setSelected(true);
-            miku.setAppMode(MikuCharacter.AppMode.CASUAL);
-        });
-
-        gamingItem.addActionListener(e -> {
-            casualItem.setSelected(false);
-            workingItem.setSelected(false);
-            gamingItem.setSelected(true);
-            miku.setAppMode(MikuCharacter.AppMode.GAMING);
-        });
-
-        workingItem.addActionListener(e -> {
-            casualItem.setSelected(false);
-            gamingItem.setSelected(false);
-            workingItem.setSelected(true);
-            miku.setAppMode(MikuCharacter.AppMode.WORKING);
-        });
-        // 👉 TẠO CÁC NÚT ĐIỀU KHIỂN NHẠC
-        JMenuItem trackNameItem = new JMenuItem("🎵 Nhạc: Ngừng phát");
-        trackNameItem.setEnabled(false); // Làm mờ đi vì nó chỉ dùng để làm màn hình hiển thị chữ
-
-        JMenuItem playItem = new JMenuItem("▶ Phát / Tạm dừng");
-        JMenuItem nextItem = new JMenuItem("⏭ Chuyển bài kế tiếp");
-        // 👉 THÊM NÚT CHỌN THƯ MỤC
-        JMenuItem changeFolderItem = new JMenuItem("📂 Chọn thư mục nhạc...");
-
-        // Gán chức năng cho nút
-        playItem.addActionListener(e -> musicPlayer.togglePlayPause());
-        nextItem.addActionListener(e -> musicPlayer.next());
-
-        // Lệnh gọi cửa sổ Windows Native siêu mượt
-        changeFolderItem.addActionListener(e -> {
-            // Dùng cửa sổ File gốc của Windows thay vì JFileChooser
-            java.awt.FileDialog dialog = new java.awt.FileDialog((java.awt.Frame) null,
-                    "Mẹo: Hãy chọn 1 bài hát bất kỳ trong thư mục bạn muốn nạp",
-                    java.awt.FileDialog.LOAD);
-
-            dialog.setFile("*.mp3;*.wav"); // Chỉ hiển thị các file nhạc
-            dialog.setVisible(true); // Hiển thị cửa sổ
-
-            // Tự động suy ra thư mục gốc chứa bài hát bạn vừa chọn
-            String dir = dialog.getDirectory();
-            if (dir != null) {
-                musicPlayer.setMusicFolder(new java.io.File(dir));
-            }
-        });
-
-        // Nhét tất cả vào Menu
-        swingPopup.addSeparator();
-        swingPopup.add(trackNameItem);
-        swingPopup.add(playItem);
-        swingPopup.add(nextItem);
-        swingPopup.add(changeFolderItem); // 👉 NHỚ ADD THÊM NÚT NÀY VÀO MENU
-
-        // ... (Phần code cũ) JMenuItem throwItem = new JMenuItem("Ném hành (Throw
-        // Leek)");
-        JMenuItem throwItem = new JMenuItem("Ném hành (Throw Leek)");
-        throwItem.addActionListener(e -> miku.setState(CharacterState.THROWING));
-        JMenuItem exitItem = new JMenuItem("Thoát (Dismiss)");
-        exitItem.addActionListener(e -> System.exit(0));
-
-        swingPopup.add(titleItem);
-        swingPopup.add(casualItem);
-        swingPopup.add(gamingItem);
-        swingPopup.add(workingItem);
-        swingPopup.addSeparator();
-        swingPopup.add(throwItem);
-        swingPopup.addSeparator();
-        swingPopup.add(exitItem);
-
-        JDialog hiddenDialog = new JDialog();
-        hiddenDialog.setUndecorated(true);
-        hiddenDialog.setSize(0, 0);
-        hiddenDialog.setType(java.awt.Window.Type.UTILITY);
-        hiddenDialog.setFocusableWindowState(false);
-        hiddenDialog.setAlwaysOnTop(true);
-
-        Timer autoCloseTimer = new Timer(300, e -> {
-            if (!swingPopup.isVisible()) {
-                ((Timer) e.getSource()).stop();
-                return;
-            }
-            if (swingPopup.isShowing()) {
-                Point mouse = MouseInfo.getPointerInfo().getLocation();
-                Point pLoc = swingPopup.getLocationOnScreen();
-                Dimension pSize = swingPopup.getSize();
-                Rectangle safeArea = new Rectangle(pLoc.x - 15, pLoc.y - 15, pSize.width + 30, pSize.height + 30);
-                if (!safeArea.contains(mouse)) {
-                    swingPopup.setVisible(false);
-                    hiddenDialog.setVisible(false);
-                    ((Timer) e.getSource()).stop();
-                }
-            }
-        });
-
-        swingPopup.addPopupMenuListener(new PopupMenuListener() {
-            @Override
-            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
-                // 👉 FIX LỖI MENU KHÔNG CHỊU TẮT: Kích hoạt cảm biến chuột
-                autoCloseTimer.start();
-            }
-
-            @Override
-            public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {
-                hiddenDialog.setVisible(false);
-            }
-
-            // ... (Các phần dưới giữ nguyên)
-            @Override
-            public void popupMenuCanceled(PopupMenuEvent e) {
-                hiddenDialog.setVisible(false);
-            }
-        });
-
-        TrayIcon trayIcon = new TrayIcon(iconImage, "Miku Shimeji");
-        trayIcon.setImageAutoSize(true);
-        trayIcon.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseReleased(MouseEvent e) {
-                if (SwingUtilities.isRightMouseButton(e)) {
-                    Point mousePos = MouseInfo.getPointerInfo().getLocation();
-                    hiddenDialog.setLocation(mousePos.x, mousePos.y);
-                    hiddenDialog.setVisible(true);
-                    swingPopup.show(hiddenDialog, 0, 0);
-                    autoCloseTimer.start();
-                }
-            }
-        });
-
-        try {
-            tray.add(trayIcon);
-        } catch (AWTException e) {
-            System.out.println("Lỗi: " + e.getMessage());
-        }
-
-        // 👉 CẢM BIẾN TỰ ĐỘNG CẬP NHẬT TÊN BÀI HÁT KHI MỞ MENU LÊN
-        // 👉 CẢM BIẾN TỰ ĐỘNG CẬP NHẬT TÊN BÀI HÁT KHI MỞ MENU LÊN
-        swingPopup.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
-            public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) {
-                // Cập nhật lại danh sách bài hát phòng khi có file mp3 mới
-                musicPlayer.scanMusic();
-
-                trackNameItem.setText("♪ " + musicPlayer.getCurrentTrackName());
-
-                // 👉 THÊM DÒNG NÀY: Cập nhật tên Thư mục trực tiếp lên nút Chọn
-                changeFolderItem.setText("📂 Chọn thư mục (Đang mở: " + musicPlayer.getMusicFolderName() + ")");
-            }
-
-            public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent e) {
-            }
-
-            // ...
-            public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) {
-            }
-        });
-
-        // window.setSharedMenu(swingPopup); // (Đây là dòng cũ bạn giữ nguyên)
-        // 👉 TRUYỀN MENU XỊN TỪ TASKBAR SANG CHO MIKU DÙNG CHUNG
-        window.setSharedMenu(swingPopup);
-    }
 }

@@ -51,6 +51,8 @@
               <jre>
                 <path>jre</path>
                 <minVersion>25</minVersion>
+                <initialHeapSize>64</initialHeapSize>
+                <maxHeapSize>1024</maxHeapSize>
               </jre>
             </configuration>
           </execution>

@@ -49,10 +49,12 @@ public class ClimbState implements MikuState {
 
     private void fallDown(MikuCharacter miku) {
         if (isLeftWall) {
-            miku.setX(-miku.getSidePadding() - WALL_OFFSET);
+            // 👉 SỬA LỖI Ở ĐÂY: Khi tuột tay rớt xuống, đạp mạnh văng ra khỏi tường 5 pixel
+            miku.setX(-miku.getSidePadding() + 5);
         } else {
             int rightWall = miku.getScreenWidth() - miku.getWidth() + miku.getSidePadding();
-            miku.setX(rightWall + WALL_OFFSET);
+            // Văng ra khỏi tường bên phải 5 pixel
+            miku.setX(rightWall - 5);
         }
         miku.changeState(new FallState());
     }

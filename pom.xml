@@ -27,11 +27,16 @@
       <artifactId>flatlaf</artifactId>
       <version>3.4.1</version>
     </dependency>
-        <!-- Thư viện JLayer (MP3 SPI) giúp Java đọc và hát được file .mp3 -->
+    <!-- 👇 ĐỘNG CƠ ÂM THANH JAVAFX HIỆN ĐẠI 👇 -->
     <dependency>
-      <groupId>com.googlecode.soundlibs</groupId>
-      <artifactId>mp3spi</artifactId>
-      <version>1.9.5.4</version>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-media</artifactId>
+        <version>21.0.1</version>
+    </dependency>
+    <dependency>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-controls</artifactId>
+        <version>21.0.1</version>
     </dependency>
   </dependencies>
 
@@ -92,7 +97,7 @@
                 <path>jre</path> 
                 <minVersion>25</minVersion>
                 <initialHeapSize>64</initialHeapSize>
-                <maxHeapSize>1024</maxHeapSize>
+                <maxHeapSize>4096</maxHeapSize>
               </jre>
             </configuration>
           </execution>
