@@ -44,12 +44,9 @@ public class MikuMenu {
 
         JPopupMenu swingPopup = new JPopupMenu();
 
-        JMenuItem titleItem = new JMenuItem("--- Chọn chế độ ---");
-        titleItem.setEnabled(false);
-
-        JCheckBoxMenuItem casualItem = new JCheckBoxMenuItem("Casual Mode", true);
-        JCheckBoxMenuItem gamingItem = new JCheckBoxMenuItem("Gaming Mode");
-        JCheckBoxMenuItem workingItem = new JCheckBoxMenuItem("Working Mode");
+        JCheckBoxMenuItem casualItem = new JCheckBoxMenuItem("Chế độ Thư giãn", true);
+        JCheckBoxMenuItem gamingItem = new JCheckBoxMenuItem("Chế độ Tập Trung");
+        JCheckBoxMenuItem workingItem = new JCheckBoxMenuItem("Chế độ Làm việc");
 
         casualItem.addActionListener(e -> {
             gamingItem.setSelected(false);
@@ -149,48 +146,87 @@ public class MikuMenu {
             }
         });
 
-        JCheckBoxMenuItem playItem = new JCheckBoxMenuItem("▶ Phát / Tạm dừng");
-        JCheckBoxMenuItem prevItem = new JCheckBoxMenuItem("⏮ Chuyển bài trước");
-        JCheckBoxMenuItem nextItem = new JCheckBoxMenuItem("⏭ Chuyển bài kế tiếp");
+        // ==========================================
+        // KHU VỰC THANH ĐIỀU KHIỂN MEDIA (NẰM NGANG)
+        // ==========================================
+        JPanel mediaControlPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
+        mediaControlPanel.setBackground(menuBg); // Dùng lại màu nền cho tiệp màu
 
-        // 👉 THÊM ĐOẠN NÀY VÀO:
-        JCheckBoxMenuItem shuffleItem = new JCheckBoxMenuItem("🔀 Trộn bài", musicPlayer.isShuffle());
-        shuffleItem.addActionListener(e -> {
-            musicPlayer.setShuffle(shuffleItem.isSelected());
+        JButton btnShuffle = new JButton("🔀");
+        JButton btnPrev = new JButton("⏮");
+        JButton btnPlay = new JButton(musicPlayer.isPlaying() ? "⏸" : "▶");
+        JButton btnNext = new JButton("⏭");
+        JButton btnRepeat = new JButton("🔁");
+
+        // Màu sắc: Nút nào bật thì sáng màu Xanh, tắt thì màu Xám
+        Color colorOn = new Color(0, 150, 255);
+        Color colorOff = Color.GRAY;
+
+        // Cài đặt giao diện cho cả 5 nút cùng lúc (xóa viền, làm nền trong suốt...)
+        JButton[] mediaBtns = { btnShuffle, btnPrev, btnPlay, btnNext, btnRepeat };
+        for (JButton btn : mediaBtns) {
+            btn.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 18));
+            btn.setFocusPainted(false);
+            btn.setContentAreaFilled(false);
+            btn.setBorderPainted(false);
+            btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
+            btn.setMargin(new Insets(0, 0, 0, 0));
+            mediaControlPanel.add(btn); // Nhét vào thanh ngang
+        }
+
+        // Cài đặt màu ban đầu dựa vào việc bạn có đang bật Trộn/Lặp không
+        btnShuffle.setForeground(musicPlayer.isShuffle() ? colorOn : colorOff);
+        btnRepeat.setForeground(musicPlayer.isRepeatOne() ? colorOn : colorOff);
+        btnPrev.setForeground(Color.WHITE);
+        btnNext.setForeground(Color.WHITE);
+        btnPlay.setForeground(Color.WHITE);
+
+        // Chức năng khi bấm nút Trộn
+        btnShuffle.addActionListener(e -> {
+            boolean newState = !musicPlayer.isShuffle();
+            musicPlayer.setShuffle(newState);
+            btnShuffle.setForeground(newState ? colorOn : colorOff); // Đổi màu
+            SwingUtilities.invokeLater(() -> swingPopup.repaint());
+        });
+
+        // Chức năng khi bấm nút Lặp
+        btnRepeat.addActionListener(e -> {
+            boolean newState = !musicPlayer.isRepeatOne();
+            musicPlayer.setRepeatOne(newState);
+            btnRepeat.setForeground(newState ? colorOn : colorOff); // Đổi màu
+            SwingUtilities.invokeLater(() -> swingPopup.repaint());
+        });
+
+        // Chức năng Phát / Dừng
+        btnPlay.addActionListener(e -> {
+            musicPlayer.togglePlayPause();
+            btnPlay.setText(musicPlayer.isPlaying() ? "⏸" : "▶"); // Đổi icon
+            SwingUtilities.invokeLater(() -> swingPopup.repaint());
+        });
+
+        // Chức năng Chuyển bài Kế tiếp
+        btnNext.addActionListener(e -> {
+            trackNameItem.setText("♪ Đang nạp nhạc...");
+            progSlider.setValue(0);
+            progValueLabel.setText("00:00 : 00:00 ");
+            musicPlayer.next();
+            btnPlay.setText("⏸"); // Chuyển bài thì chắc chắn là sẽ auto phát
+            SwingUtilities.invokeLater(() -> swingPopup.repaint());
+        });
+
+        // Chức năng Chuyển bài Trước
+        btnPrev.addActionListener(e -> {
+            trackNameItem.setText("♪ Đang nạp nhạc...");
+            progSlider.setValue(0);
+            progValueLabel.setText("00:00 : 00:00 ");
+            musicPlayer.previous();
+            btnPlay.setText("⏸"); // Chuyển bài thì chắc chắn là sẽ auto phát
             SwingUtilities.invokeLater(() -> swingPopup.repaint());
         });
 
         // Nút chọn thư mục thì cứ để là JMenuItem thường vì bấm xong là phải đóng để
         // hiện cửa sổ
         JMenuItem changeFolderItem = new JMenuItem("📂 Chọn thư mục nhạc...");
-
-        playItem.addActionListener(e -> {
-            musicPlayer.togglePlayPause();
-            playItem.setSelected(false);
-            SwingUtilities.invokeLater(() -> swingPopup.repaint());
-        });
-
-        nextItem.addActionListener(e -> {
-            // 👉 BƯỚC ĐỆM: Xóa sạch bóng ma cũ ngay lập tức để chờ nạp bài mới
-            trackNameItem.setText("♪ Đang nạp nhạc...");
-            progSlider.setValue(0);
-            progValueLabel.setText("00:00 : 00:00 ");
-
-            musicPlayer.next(); // Bắt đầu load bài mới (mất 1-2 giây)
-            nextItem.setSelected(false);
-            SwingUtilities.invokeLater(() -> swingPopup.repaint());
-        });
-
-        prevItem.addActionListener(e -> {
-            // 👉 BƯỚC ĐỆM: Xóa sạch bóng ma cũ ngay lập tức để chờ nạp bài mới
-            trackNameItem.setText("♪ Đang nạp nhạc...");
-            progSlider.setValue(0);
-            progValueLabel.setText("00:00 : 00:00 ");
-
-            musicPlayer.previous(); // Bắt đầu load bài mới (mất 1-2 giây)
-            prevItem.setSelected(false);
-            SwingUtilities.invokeLater(() -> swingPopup.repaint());
-        });
 
         changeFolderItem.addActionListener(e -> {
             FileDialog dialog = new FileDialog((Frame) null,
@@ -202,11 +238,12 @@ public class MikuMenu {
             if (dir != null) {
                 musicPlayer.setMusicFolder(new java.io.File(dir));
             }
+            btnPlay.setText("⏸");
         });
 
-        JMenuItem throwItem = new JMenuItem("Ném hành (Throw Leek)");
+        JMenuItem throwItem = new JMenuItem("Ném hành");
         throwItem.addActionListener(e -> miku.setState(CharacterState.THROWING));
-        JMenuItem exitItem = new JMenuItem("Thoát (Dismiss)");
+        JMenuItem exitItem = new JMenuItem("🚪 Thoát ứng dụng");
         exitItem.addActionListener(e -> {
             musicPlayer.saveState(); // Ép lưu trước khi tắt
             System.exit(0);
@@ -231,6 +268,7 @@ public class MikuMenu {
          * nextItem : Nút Chuyển bài kế tiếp
          * prevItem : Nút Chuyển bài trước đấy
          * shuffleItem : Nút để bật lên thì bài hát kế tiếp là ngẫu nhiên
+         * repeatItem : Nút để bật lên thì sẽ lặp lại bài hát đấy
          * changeFolderItem : Nút Chọn thư mục nhạc (Gợi ý: Không nên cho vào vì nó cần
          * mở cửa sổ mới)
          * 
@@ -243,15 +281,15 @@ public class MikuMenu {
          */
 
         // 👉 DÙNG HÀM TIỆN ÍCH OOP MÀ CHÚNG TA VỪA LÀM
-        keepMenuOpen(playItem, nextItem, casualItem, gamingItem, workingItem, volSlider, progSlider, prevItem,
-                shuffleItem);
+        keepMenuOpen(casualItem, gamingItem, workingItem, volSlider, progSlider, btnShuffle, btnPrev, btnPlay, btnNext,
+                btnRepeat);
 
         // ==========================================
         // 1. TẠO CÁC DANH MỤC MẸ
         // ==========================================
-        JMenu musicMenu = new JMenu("🎵 Phát nhạc");
-        JMenu modeMenu = new JMenu("⚙️ Chế độ");
-        JMenu actionMenu = new JMenu("🏃 Hành động");
+        JMenu musicMenu = new JMenu("🎧 Trình phát nhạc");
+        JMenu modeMenu = new JMenu("⚙️ Trạng thái hoạt động");
+        JMenu actionMenu = new JMenu("🏃 Tương tác");
 
         // ==========================================
         // 2. NHÉT CÁC NÚT VÀO TỪNG DANH MỤC
@@ -262,14 +300,10 @@ public class MikuMenu {
         musicMenu.add(progressPanel);
         musicMenu.add(volumePanel);
         musicMenu.addSeparator(); // Đường kẻ mờ phân cách
-        musicMenu.add(shuffleItem);
-        musicMenu.add(prevItem); // Lắp vào đây!
-        musicMenu.add(playItem);
-        musicMenu.add(nextItem);
+        musicMenu.add(mediaControlPanel);
         musicMenu.add(changeFolderItem);
 
         // --- Danh mục: CHẾ ĐỘ ---
-        modeMenu.add(titleItem); // Label "Chọn chế độ ---" của bạn
         modeMenu.add(casualItem);
         modeMenu.add(gamingItem);
         modeMenu.add(workingItem);
@@ -325,7 +359,7 @@ public class MikuMenu {
                 if (!safeArea.contains(mouse) && moveDist > 100) {
                     if (outOfBoundsTime[0] == 0) {
                         outOfBoundsTime[0] = System.currentTimeMillis();
-                    } else if (System.currentTimeMillis() - outOfBoundsTime[0] >= 2000) {
+                    } else if (System.currentTimeMillis() - outOfBoundsTime[0] >= 1000) {
                         swingPopup.setVisible(false);
                         hiddenDialog.setVisible(false);
                         ((Timer) e.getSource()).stop();

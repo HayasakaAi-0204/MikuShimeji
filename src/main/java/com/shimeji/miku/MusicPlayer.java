@@ -22,6 +22,7 @@ public class MusicPlayer {
 
     // 👉 THÊM 2 BIẾN NÀY DÀNH CHO TÍNH NĂNG TRỘN BÀI
     private boolean isShuffle = false;
+    private boolean isRepeatOne = false;
     private List<Integer> history = new ArrayList<>();
 
     // Cảm biến để báo cáo thời gian thực cho Thanh trượt giao diện
@@ -31,6 +32,7 @@ public class MusicPlayer {
     public MusicPlayer() {
         prefs = Preferences.userNodeForPackage(MusicPlayer.class);
         isShuffle = prefs.getBoolean("isShuffle", false); // 👉 Thêm dòng này
+        isRepeatOne = prefs.getBoolean("isRepeatOne", false); // Nhớ trạng thái lặp bài
         playlist = new ArrayList<>();
         String savedPath = prefs.get("musicFolderPath", null);
         if (savedPath != null) {
@@ -120,7 +122,7 @@ public class MusicPlayer {
         // Tạm thời TẮT TIẾNG để làm ảo thuật lừa JavaFX
         mediaPlayer.setVolume(0);
 
-        mediaPlayer.setOnEndOfMedia(this::next);
+        mediaPlayer.setOnEndOfMedia(this::autoNext);
 
         mediaPlayer.setOnReady(() -> {
             if (onTrackChange != null)
@@ -321,5 +323,37 @@ public class MusicPlayer {
     public void setShuffle(boolean shuffle) {
         this.isShuffle = shuffle;
         prefs.putBoolean("isShuffle", shuffle);
+    }
+
+    // 👇 HÀM CHUYỂN BÀI TỰ ĐỘNG (KHI HẾT NHẠC) 👇
+    public void autoNext() {
+        if (playlist.isEmpty())
+            return;
+
+        if (isRepeatOne) {
+            // Nếu bật Lặp 1 bài -> Tua ngay về giây thứ 0 (Siêu mượt, không cần tải lại
+            // bóng ma)
+            if (mediaPlayer != null) {
+                mediaPlayer.seek(javafx.util.Duration.ZERO);
+                mediaPlayer.play();
+                isPlaying = true;
+            }
+        } else {
+            // Không lặp -> Giao lại cho hàm next() để chuyển bài (hoặc trộn bài)
+            next();
+        }
+    }
+
+    public boolean isRepeatOne() {
+        return isRepeatOne;
+    }
+
+    public void setRepeatOne(boolean repeat) {
+        this.isRepeatOne = repeat;
+        prefs.putBoolean("isRepeatOne", repeat);
+    }
+
+    public boolean isPlaying() {
+        return isPlaying;
     }
 }
