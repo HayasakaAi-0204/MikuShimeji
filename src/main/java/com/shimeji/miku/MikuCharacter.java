@@ -1,4 +1,3 @@
-// File 3: MikuCharacter.java
 package com.shimeji.miku;
 
 import java.awt.Toolkit;
@@ -13,10 +12,10 @@ public class MikuCharacter {
 
     private AppMode appMode = AppMode.CASUAL;
 
-    public static final long WORK_MIN_MS = 1 * 15 * 1000L;
-    public static final long WORK_MAX_MS = 1 * 15 * 1000L;
-    public static final long WARNING_TIME_MS = 1 * 10 * 1000L;
-    public static final long BREAK_TIME_MS = 60 * 1000L;
+    // Thay thế các hằng số tĩnh cũ bằng các biến linh hoạt có thể thay đổi
+    private long workTimeMs = 3600 * 1000L;
+    private long breakTimeMs = 60 * 1000L;
+    private long activeBreakDuration = 60 * 1000L;
 
     public enum PomodoroPhase {
         INACTIVE, WORKING, WAITING_TO_LAND, LEAVING_TO_GROW, BREAK, LEAVING_TO_SHRINK
@@ -47,6 +46,30 @@ public class MikuCharacter {
         this.screenWidth = Toolkit.getDefaultToolkit().getScreenSize().width;
         this.currentState = new FallState();
         this.currentState.enter(this);
+        
+        // Đọc giá trị thời gian đã lưu từ Menu khi khởi động app
+        java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userNodeForPackage(MikuMenu.class);
+        this.workTimeMs = prefs.getInt("mikuWorkTime", 3600) * 1000L;
+        this.breakTimeMs = prefs.getInt("mikuBreakTime", 60) * 1000L;
+    }
+    
+    // 👉 HÀM MỚI: ĐỂ MENU GỌI VÀO CẬP NHẬT THỜI GIAN
+    public void updateTimers(long workSeconds, long breakSeconds) {
+        long newWorkMs = workSeconds * 1000L;
+        long newBreakMs = breakSeconds * 1000L;
+        
+        boolean workChanged = (this.workTimeMs != newWorkMs);
+        
+        this.workTimeMs = newWorkMs;
+        this.breakTimeMs = newBreakMs;
+        
+        // Nếu đang trong đợt làm việc và có thay đổi Work Time -> Reset đếm ngược lại từ đầu
+        if ((pPhase == PomodoroPhase.WORKING || pPhase == PomodoroPhase.WAITING_TO_LAND || pPhase == PomodoroPhase.LEAVING_TO_GROW) && workChanged) {
+            this.pomodoroStartTime = System.currentTimeMillis();
+            this.pomodoroDuration = this.workTimeMs; 
+        }
+        // Lưu ý: Nếu đang nghỉ (Miku khổng lồ), ta KHÔNG đụng chạm gì tới activeBreakDuration của đợt này.
+        // Thời gian Break mới sẽ tự động được áp dụng ở đợt Miku khổng lồ TIẾP THEO.
     }
 
     public double getScale() {
@@ -65,16 +88,16 @@ public class MikuCharacter {
         // 👉 XỬ LÝ MƯỢT MÀ KHI TẮT NGANG MIKU KHỔNG LỒ
         if (this.scale > 1.0) {
             this.scale = 1.0;
-            this.x = screenWidth / 2 - this.getWidth() / 2; // Căn giữa màn hình
-            this.y = -200; // Nhấc bổng lên trần nhà ngoài màn hình
-            changeState(new FallState()); // Thả rơi tự do!
-            justShrunk = true; // Cắm cờ báo hiệu ẻm đang bận rớt!
+            this.x = screenWidth / 2 - this.getWidth() / 2;
+            this.y = -200; 
+            changeState(new FallState()); 
+            justShrunk = true; 
         }
 
         if (mode == AppMode.WORKING) {
             pPhase = PomodoroPhase.WORKING;
             pomodoroStartTime = System.currentTimeMillis();
-            pomodoroDuration = WORK_MIN_MS + (long) (Math.random() * (WORK_MAX_MS - WORK_MIN_MS));
+            pomodoroDuration = this.workTimeMs; // Dùng thời gian linh hoạt
         } else {
             pPhase = PomodoroPhase.INACTIVE;
         }
@@ -84,15 +107,10 @@ public class MikuCharacter {
                 boolean isLeftWall = (this.x < screenWidth / 2);
 
                 if (currentState instanceof FallState || currentState instanceof DragState) {
-                    // 👉 Đang rơi hoặc đang bị nắm đầu: Ghi nhớ lệnh "Chạm đất xong thì tự đi bộ ra
-                    // tường"
                     this.pendingState = new WalkState(isLeftWall);
                 } else if (currentState instanceof ClimbState) {
-                    // 👉 Đang leo tường sẵn rồi thì xóa lịch trình, cứ yên vị ở đó
                     this.pendingState = null;
                 } else {
-                    // 👉 Đang đứng dưới đất: Xóa lịch trình chờ và ép đi bộ ra vách tường ngay lập
-                    // tức
                     this.pendingState = null;
                     changeState(new WalkState(isLeftWall));
                 }
@@ -100,7 +118,6 @@ public class MikuCharacter {
                 this.pendingState = null;
             }
         } else {
-            // (Phần code cũ của các Mode khác giữ nguyên)
             if (currentState instanceof WalkState && !justShrunk)
                 changeState(new IdleState());
         }
@@ -137,7 +154,8 @@ public class MikuCharacter {
                     changeState(new WalkState(this.x < screenWidth / 2));
                 }
             } else if (pPhase == PomodoroPhase.BREAK) {
-                if (now - breakStartTime >= BREAK_TIME_MS) {
+                // 👉 Dùng activeBreakDuration (Thời gian nghỉ đã được chốt cho đợt này)
+                if (now - breakStartTime >= activeBreakDuration) {
                     pPhase = PomodoroPhase.LEAVING_TO_SHRINK;
                     changeState(new WalkState(!enteredLeftWall));
                 }
@@ -173,13 +191,12 @@ public class MikuCharacter {
         return currentState.getCurrentImage();
     }
 
-    private static final int BASE_HEIGHT = 150; // Khung xương gốc 150px
+    private static final int BASE_HEIGHT = 150;
 
     public int getWidth() {
         BufferedImage currentImg = getCurrentImage();
         if (currentImg != null) {
             double aspect = (double) currentImg.getWidth() / currentImg.getHeight();
-            // Lấy chiều cao thực tế nhân với tỷ lệ gốc để ra chiều rộng
             this.width = (int) (this.getHeight() * aspect);
         }
         return this.width;
@@ -188,7 +205,6 @@ public class MikuCharacter {
     public int getHeight() {
         BufferedImage currentImg = getCurrentImage();
         if (currentImg != null) {
-            // Lấy chiều cao ảnh gốc chia cho 720px chuẩn để tính tỷ lệ bù trừ
             double heightRatio = (double) currentImg.getHeight() / 250.0;
             this.height = (int) (BASE_HEIGHT * scale * heightRatio);
         }
@@ -205,15 +221,13 @@ public class MikuCharacter {
             this.setEquippedItem(new LeekItem());
         }
 
-        // 👉 KHÓA HOẠT ĐỘNG CHO MIKU KHỔNG LỒ (Tự động chặn luôn các tính năng thêm vào
-        // trong tương lai)
         if (scale > 1.0) {
             if (newState instanceof ClimbState) {
                 if (pPhase == PomodoroPhase.LEAVING_TO_SHRINK) {
                     scale = 1.0;
                     pPhase = PomodoroPhase.WORKING;
                     pomodoroStartTime = System.currentTimeMillis();
-                    pomodoroDuration = WORK_MIN_MS + (long) (Math.random() * (WORK_MAX_MS - WORK_MIN_MS));
+                    pomodoroDuration = this.workTimeMs; // Dùng thời gian linh hoạt
                     boolean wasWalkingLeft = (this.x < screenWidth / 2);
                     this.x = wasWalkingLeft ? -this.getWidth() : screenWidth;
                     newState = new WalkState(!wasWalkingLeft);
@@ -221,8 +235,6 @@ public class MikuCharacter {
                     newState = new IdleState();
                 }
             }
-            // Nếu trạng thái nội bộ không nằm trong 4 danh sách cho phép (Đứng, Đi, Rơi,
-            // Kéo) -> Ép về Đứng im!
             else if (!(newState instanceof IdleState) &&
                     !(newState instanceof WalkState) &&
                     !(newState instanceof FallState) &&
@@ -230,9 +242,13 @@ public class MikuCharacter {
                 newState = new IdleState();
             }
         } else if (scale == 1.0 && pPhase == PomodoroPhase.LEAVING_TO_GROW && newState instanceof ClimbState) {
-            scale = 8.0; // 👉 Đã giữ nguyên thông số 8.0 của bạn!
+            scale = 8.0; 
             pPhase = PomodoroPhase.BREAK;
             breakStartTime = System.currentTimeMillis();
+            
+            // 👉 CHỐT THỜI GIAN NGHỈ CHO ĐỢT NÀY! Bất biến không thay đổi.
+            activeBreakDuration = this.breakTimeMs; 
+            
             enteredLeftWall = (this.x < screenWidth / 2);
             this.x = enteredLeftWall ? -this.getWidth() : screenWidth;
             newState = new WalkState(!enteredLeftWall);
@@ -246,9 +262,6 @@ public class MikuCharacter {
         if (appMode == AppMode.GAMING && enumState != CharacterState.DRAGGING && enumState != CharacterState.FALLING)
             return;
 
-        // 👉 MIKU KHỔNG LỒ MODE: Chỉ nhận lệnh từ bên ngoài (Menu) đối với các hành
-        // động dưới đây.
-        // Lệnh ném hành hay bất kỳ lệnh lạ nào khác đều bị từ chối phục vụ!
         if (scale > 1.0) {
             if (enumState != CharacterState.IDLE &&
                     enumState != CharacterState.WALKING_LEFT &&
@@ -328,10 +341,11 @@ public class MikuCharacter {
         if (pPhase == PomodoroPhase.WORKING || pPhase == PomodoroPhase.WAITING_TO_LAND
                 || pPhase == PomodoroPhase.LEAVING_TO_GROW) {
             long remaining = pomodoroDuration - (now - pomodoroStartTime);
-            if (remaining <= WARNING_TIME_MS)
-                return formatTime(Math.max(0, remaining));
+            // 👉 Đã xóa điều kiện ẩn, từ nay đồng hồ làm việc luôn hiển thị!
+            return formatTime(Math.max(0, remaining));
+            
         } else if (pPhase == PomodoroPhase.BREAK || pPhase == PomodoroPhase.LEAVING_TO_SHRINK) {
-            long remaining = BREAK_TIME_MS - (now - breakStartTime);
+            long remaining = activeBreakDuration - (now - breakStartTime);
             return formatTime(Math.max(0, remaining));
         }
         return null;
@@ -383,12 +397,9 @@ public class MikuCharacter {
     }
 
     public int getSpeed() {
-        // 👉 CHỈNH TỐC ĐỘ MIKU KHỔNG LỒ Ở ĐÂY
         if (scale > 1.0) {
-            return 14; // Mặc định là 12. Bạn có thể tăng lên 16, 20... tùy thích!
+            return 14; 
         }
-
-        // Tốc độ của Miku nhỏ (vẫn giữ nguyên không bị ảnh hưởng)
         return speed;
     }
 
@@ -417,9 +428,8 @@ public class MikuCharacter {
     }
 
     public void setPaused(boolean paused) {
-        // 👉 TRỊ DỨT ĐIỂM TRẠNG THÁI PAUSE TRONG GAMING MODE
         if (paused && this.appMode == AppMode.GAMING) {
-            return; // Kháng lệnh! Nếu đang Gaming Mode thì từ chối không cho Pause!
+            return; 
         }
 
         this.isPaused = paused;
@@ -432,21 +442,17 @@ public class MikuCharacter {
 
     public void forceExitGiantState() {
         if (this.scale <= 1.0)
-            return; // Nếu đang nhỏ sẵn thì bỏ qua
+            return; 
 
-        // 1. Ép biến lại thành Miku nhỏ
         this.scale = 1.0;
 
-        // 2. Ép quay lại ca làm việc bình thường ngay lập tức
         this.pPhase = PomodoroPhase.WORKING;
         this.pomodoroStartTime = System.currentTimeMillis();
-        this.pomodoroDuration = WORK_MIN_MS + (long) (Math.random() * (WORK_MAX_MS - WORK_MIN_MS));
+        this.pomodoroDuration = this.workTimeMs; // Dùng thời gian linh hoạt
 
-        // 3. Dịch chuyển lên sát trần nhà giữa màn hình (giống y hệt lúc khởi động app)
         this.x = screenWidth / 2 - this.getWidth() / 2;
         this.y = -200;
 
-        // 4. Kích hoạt trạng thái rơi tự do
         this.changeState(new FallState());
     }
 

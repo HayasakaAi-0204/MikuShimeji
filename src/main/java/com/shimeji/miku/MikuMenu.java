@@ -1,9 +1,45 @@
 package com.shimeji.miku;
 
-import javax.swing.*;
-import java.awt.*;
+import java.awt.AWTException;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.FileDialog;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Frame;
+import java.awt.Image;
+import java.awt.Insets;
+import java.awt.MouseInfo;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.SystemTray;
+import java.awt.Toolkit;
+import java.awt.TrayIcon;
+import java.awt.Window;
 import java.net.URL;
+import java.util.Locale;
+import java.util.ResourceBundle;
 import java.util.prefs.Preferences;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JComponent;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuItem;
+import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
+import javax.swing.JSlider;
+import javax.swing.MenuElement;
+import javax.swing.MenuSelectionManager;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 
 public class MikuMenu {
     // Các thuộc tính (Properties)
@@ -44,9 +80,21 @@ public class MikuMenu {
 
         JPopupMenu swingPopup = new JPopupMenu();
 
-        JCheckBoxMenuItem casualItem = new JCheckBoxMenuItem("Chế độ Thư giãn", true);
-        JCheckBoxMenuItem gamingItem = new JCheckBoxMenuItem("Chế độ Tập Trung");
-        JCheckBoxMenuItem workingItem = new JCheckBoxMenuItem("Chế độ Làm việc");
+        JDialog hiddenDialog = new JDialog();
+        hiddenDialog.setUndecorated(true);
+        hiddenDialog.setSize(0, 0);
+        hiddenDialog.setType(Window.Type.UTILITY);
+        hiddenDialog.setFocusableWindowState(true);
+        hiddenDialog.setAlwaysOnTop(true);
+
+        // 👉 ĐỌC NGÔN NGỮ TỪ HỆ THỐNG VÀ NẠP FILE TƯƠNG ỨNG
+        Preferences prefs = Preferences.userNodeForPackage(MikuMenu.class);
+        String savedLang = prefs.get("mikuLanguage", "vi");
+        ResourceBundle lang = ResourceBundle.getBundle("lang.messages", Locale.of(savedLang));
+
+        JCheckBoxMenuItem casualItem = new JCheckBoxMenuItem(lang.getString("menu.casual"), true);
+        JCheckBoxMenuItem gamingItem = new JCheckBoxMenuItem(lang.getString("menu.gaming"));
+        JCheckBoxMenuItem workingItem = new JCheckBoxMenuItem(lang.getString("menu.working"));
 
         casualItem.addActionListener(e -> {
             gamingItem.setSelected(false);
@@ -72,7 +120,8 @@ public class MikuMenu {
             SwingUtilities.invokeLater(() -> swingPopup.repaint()); // 👉 Đợi xử lý click xong rồi ép vẽ lại!
         });
 
-        JMenuItem trackNameItem = new JMenuItem("🎵 Nhạc: Ngừng phát");
+        JMenuItem trackNameItem = new JMenuItem(lang.getString("menu.track.stop"));
+
         trackNameItem.setEnabled(false);
 
         // ==========================================
@@ -87,7 +136,6 @@ public class MikuMenu {
         volLabel.setForeground(Color.WHITE);
         volLabel.setPreferredSize(new Dimension(35, 20));
 
-        Preferences prefs = Preferences.userNodeForPackage(MikuMenu.class);
         int savedVolume = prefs.getInt("mikuVolume", 50);
 
         JSlider volSlider = new JSlider(0, 100, savedVolume);
@@ -206,7 +254,7 @@ public class MikuMenu {
 
         // Chức năng Chuyển bài Kế tiếp
         btnNext.addActionListener(e -> {
-            trackNameItem.setText("♪ Đang nạp nhạc...");
+            trackNameItem.setText(lang.getString("menu.track.loading"));
             progSlider.setValue(0);
             progValueLabel.setText("00:00 : 00:00 ");
             musicPlayer.next();
@@ -216,7 +264,7 @@ public class MikuMenu {
 
         // Chức năng Chuyển bài Trước
         btnPrev.addActionListener(e -> {
-            trackNameItem.setText("♪ Đang nạp nhạc...");
+            trackNameItem.setText(lang.getString("menu.track.loading"));
             progSlider.setValue(0);
             progValueLabel.setText("00:00 : 00:00 ");
             musicPlayer.previous();
@@ -226,11 +274,11 @@ public class MikuMenu {
 
         // Nút chọn thư mục thì cứ để là JMenuItem thường vì bấm xong là phải đóng để
         // hiện cửa sổ
-        JMenuItem changeFolderItem = new JMenuItem("📂 Chọn thư mục nhạc...");
+        JMenuItem changeFolderItem = new JMenuItem(lang.getString("menu.folder"));
 
         changeFolderItem.addActionListener(e -> {
             FileDialog dialog = new FileDialog((Frame) null,
-                    "Mẹo: Hãy chọn 1 bài hát bất kỳ trong thư mục bạn muốn nạp", FileDialog.LOAD);
+                    lang.getString("menu.folder.tip"), FileDialog.LOAD);
             dialog.setFile("*.mp3;*.wav");
             dialog.setVisible(true);
 
@@ -241,13 +289,164 @@ public class MikuMenu {
             btnPlay.setText("⏸");
         });
 
-        JMenuItem throwItem = new JMenuItem("Ném hành");
+        JMenuItem throwItem = new JMenuItem(lang.getString("menu.throw"));
         throwItem.addActionListener(e -> miku.setState(CharacterState.THROWING));
-        JMenuItem exitItem = new JMenuItem("🚪 Thoát ứng dụng");
+        JMenuItem exitItem = new JMenuItem(lang.getString("menu.exit"));
+
         exitItem.addActionListener(e -> {
             musicPlayer.saveState(); // Ép lưu trước khi tắt
             System.exit(0);
         });
+
+        // ==========================================
+        // KHU VỰC THIẾT LẬP (SETTINGS)
+        // ==========================================
+        // Đọc ngôn ngữ đã lưu trong máy (mặc định là 'vi' - Tiếng Việt)
+
+        JMenu settingsMenu = new JMenu(lang.getString("menu.settings"));
+        JMenu languageMenu = new JMenu(lang.getString("menu.language"));
+
+        JCheckBoxMenuItem langViItem = new JCheckBoxMenuItem("Tiếng Việt", savedLang.equals("vi"));
+        JCheckBoxMenuItem langEnItem = new JCheckBoxMenuItem("English", savedLang.equals("en"));
+
+        // Chức năng khi bấm chọn Tiếng Việt
+        langViItem.addActionListener(e -> {
+            langViItem.setSelected(true);
+            langEnItem.setSelected(false);
+            prefs.put("mikuLanguage", "vi");
+            restartApp(); // 👉 Gọi hàm tự khởi động lại
+        });
+
+        // Chức năng khi bấm chọn Tiếng Anh
+        langEnItem.addActionListener(e -> {
+            langEnItem.setSelected(true);
+            langViItem.setSelected(false);
+            prefs.put("mikuLanguage", "en");
+            restartApp(); // 👉 Gọi hàm tự khởi động lại
+        });
+
+        // Lắp 2 nút vào Menu Ngôn ngữ
+        languageMenu.add(langViItem);
+        languageMenu.add(langEnItem);
+
+        // Lắp Menu Ngôn ngữ vào Menu Thiết lập
+        settingsMenu.add(languageMenu);
+
+        // ==========================================
+        // TÍNH NĂNG ĐẶT THỜI GIAN LÀM VIỆC & NGHỈ NGƠI (DÙNG HỘP THOẠI CHUẨN CỦA JAVA)
+        // ==========================================
+
+        int savedWorkTime = prefs.getInt("mikuWorkTime", 3600);
+        int savedBreakTime = prefs.getInt("mikuBreakTime", 60);
+
+        // Hàm OOP tạo ô nhập chữ (Dùng hộp thoại Dialog chuẩn - Mượt mà & Không bao giờ
+        // bị đè)
+        java.util.function.BiFunction<String, Integer, JLabel> createClickableBox = (text, maxVal) -> {
+            JLabel label = new JLabel(text, SwingConstants.CENTER);
+            label.setOpaque(true);
+            label.setBackground(Color.WHITE);
+            label.setForeground(Color.BLACK);
+            label.setPreferredSize(new Dimension(35, 22));
+            label.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
+            label.setCursor(new Cursor(Cursor.HAND_CURSOR)); // Đổi thành icon bàn tay cho dễ bấm
+
+            label.addMouseListener(new java.awt.event.MouseAdapter() {
+                public void mousePressed(java.awt.event.MouseEvent e) {
+                    // Đánh dấu không cho phép tự động tắt menu
+                    swingPopup.putClientProperty("isEditingTime", true);
+
+                    // Mở hộp thoại nhập liệu chuẩn của Java (Không bao giờ bị đè, luôn nổi trên
+                    // cùng)
+                    String input = javax.swing.JOptionPane.showInputDialog(
+                            hiddenDialog,
+                            "Nhập thời gian:",
+                            label.getText());
+
+                    // Nếu người dùng ấn OK và có nhập số
+                    if (input != null && !input.trim().isEmpty()) {
+                        try {
+                            int val = Integer.parseInt(input.trim());
+                            if (val >= 0 && (maxVal == 0 || val <= maxVal)) {
+                                label.setText(maxVal > 0 ? String.format("%02d", val) : String.valueOf(val));
+                                label.firePropertyChange("timeChanged", 0, 1);
+                            }
+                        } catch (Exception ex) {
+                            // Nhập bậy bạ (chữ cái) thì bỏ qua
+                        }
+                    }
+
+                    // Nhả đánh dấu để menu hoạt động bình thường lại
+                    swingPopup.putClientProperty("isEditingTime", false);
+                }
+            });
+
+            return label;
+        };
+
+        // --- Panel Thời Gian Làm Việc ---
+        JPanel workTimePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
+        workTimePanel.setBackground(swingPopup.getBackground());
+
+        JLabel workLabel = new JLabel(lang.getString("menu.worktime") + ":");
+        workLabel.setForeground(Color.WHITE);
+        workLabel.setPreferredSize(new Dimension(110, 22));
+
+        JLabel workMinBox = createClickableBox.apply(String.valueOf(savedWorkTime / 60), 0);
+        JLabel colon1 = new JLabel(":");
+        colon1.setForeground(Color.WHITE);
+        JLabel workSecBox = createClickableBox.apply(String.format("%02d", savedWorkTime % 60), 59);
+
+        workTimePanel.add(workLabel);
+        workTimePanel.add(workMinBox);
+        workTimePanel.add(colon1);
+        workTimePanel.add(workSecBox);
+
+        // --- Panel Thời Gian Nghỉ ---
+        JPanel breakTimePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 2));
+        breakTimePanel.setBackground(swingPopup.getBackground());
+
+        JLabel breakLabel = new JLabel(lang.getString("menu.breaktime") + ":");
+        breakLabel.setForeground(Color.WHITE);
+        breakLabel.setPreferredSize(new Dimension(110, 22));
+
+        JLabel breakMinBox = createClickableBox.apply(String.valueOf(savedBreakTime / 60), 0);
+        JLabel colon2 = new JLabel(":");
+        colon2.setForeground(Color.WHITE);
+        JLabel breakSecBox = createClickableBox.apply(String.format("%02d", savedBreakTime % 60), 59);
+
+        breakTimePanel.add(breakLabel);
+        breakTimePanel.add(breakMinBox);
+        breakTimePanel.add(colon2);
+        breakTimePanel.add(breakSecBox);
+
+        // 👉 Hàm tự động Lưu thời gian mỗi khi bạn nhập số xong
+        java.beans.PropertyChangeListener autoSaver = evt -> {
+            int wm = Integer.parseInt(workMinBox.getText());
+            int ws = Integer.parseInt(workSecBox.getText());
+            int totalWork = wm * 60 + ws;
+            prefs.putInt("mikuWorkTime", totalWork);
+
+            int bm = Integer.parseInt(breakMinBox.getText());
+            int bs = Integer.parseInt(breakSecBox.getText());
+            int totalBreak = bm * 60 + bs;
+            prefs.putInt("mikuBreakTime", totalBreak);
+
+            // 👉 DÒNG QUAN TRỌNG NHẤT BỊ THIẾU: Báo tin cho Miku để reset đồng hồ ngay lập
+            // tức!
+            miku.updateTimers(totalWork, totalBreak);
+        };
+
+        workMinBox.addPropertyChangeListener("timeChanged", autoSaver);
+        workSecBox.addPropertyChangeListener("timeChanged", autoSaver);
+        breakMinBox.addPropertyChangeListener("timeChanged", autoSaver);
+        breakSecBox.addPropertyChangeListener("timeChanged", autoSaver);
+
+        // Thần chú giữ menu không bị đóng khi click vào ô chim mồi
+        keepMenuOpen(workMinBox, workSecBox, breakMinBox, breakSecBox);
+
+        settingsMenu.addSeparator();
+        settingsMenu.add(workTimePanel);
+        settingsMenu.add(breakTimePanel);
 
         /*
          * =============================================================================
@@ -281,15 +480,14 @@ public class MikuMenu {
          */
 
         // 👉 DÙNG HÀM TIỆN ÍCH OOP MÀ CHÚNG TA VỪA LÀM
-        keepMenuOpen(casualItem, gamingItem, workingItem, volSlider, progSlider, btnShuffle, btnPrev, btnPlay, btnNext,
-                btnRepeat);
+        keepMenuOpen(volSlider, progSlider, btnShuffle, btnPrev, btnPlay, btnNext, btnRepeat);
 
         // ==========================================
         // 1. TẠO CÁC DANH MỤC MẸ
         // ==========================================
-        JMenu musicMenu = new JMenu("🎧 Trình phát nhạc");
-        JMenu modeMenu = new JMenu("⚙️ Trạng thái hoạt động");
-        JMenu actionMenu = new JMenu("🏃 Tương tác");
+        JMenu musicMenu = new JMenu(lang.getString("menu.music"));
+        JMenu modeMenu = new JMenu(lang.getString("menu.mode"));
+        JMenu actionMenu = new JMenu(lang.getString("menu.action"));
 
         // ==========================================
         // 2. NHÉT CÁC NÚT VÀO TỪNG DANH MỤC
@@ -317,16 +515,10 @@ public class MikuMenu {
         swingPopup.add(musicMenu);
         swingPopup.add(modeMenu);
         swingPopup.add(actionMenu);
+        swingPopup.add(settingsMenu);
 
         swingPopup.addSeparator(); // Đường kẻ ngang cuối cùng
         swingPopup.add(exitItem); // Nút Thoát
-
-        JDialog hiddenDialog = new JDialog();
-        hiddenDialog.setUndecorated(true);
-        hiddenDialog.setSize(0, 0);
-        hiddenDialog.setType(Window.Type.UTILITY);
-        hiddenDialog.setFocusableWindowState(false);
-        hiddenDialog.setAlwaysOnTop(true);
 
         final Point[] startMouse = { new Point(0, 0) };
         final long[] outOfBoundsTime = { 0 };
@@ -336,8 +528,16 @@ public class MikuMenu {
                 ((Timer) e.getSource()).stop();
                 return;
             }
+
+            // 👉 THÊM 4 DÒNG NÀY ĐỂ BẢO VỆ MENU KHÔNG BỊ TẮT KHI ĐANG GÕ SỐ:
+            if (Boolean.TRUE.equals(swingPopup.getClientProperty("isEditingTime"))) {
+                outOfBoundsTime[0] = 0; // Reset bộ đếm về 0 liên tục
+                return; // Ngưng chạy phần tắt menu ở bên dưới
+            }
+
             if (swingPopup.isShowing()) {
                 Point mouse = MouseInfo.getPointerInfo().getLocation();
+                // ... (Các code cũ ở bên dưới giữ nguyên)
                 Point pLoc = swingPopup.getLocationOnScreen();
                 Dimension pSize = swingPopup.getSize();
                 // 1. Khởi tạo vùng an toàn cho Menu chính
@@ -379,7 +579,8 @@ public class MikuMenu {
 
                 musicPlayer.scanMusic();
                 trackNameItem.setText("♪ " + musicPlayer.getCurrentTrackName());
-                changeFolderItem.setText("📂 Chọn thư mục (Đang mở: " + musicPlayer.getMusicFolderName() + ")");
+                changeFolderItem.setText(
+                        String.format(lang.getString("menu.folder.current"), musicPlayer.getMusicFolderName()));
             }
 
             @Override
@@ -451,5 +652,27 @@ public class MikuMenu {
         });
 
         window.setSharedMenu(swingPopup);
+    }
+
+    // 👇 HÀM TỰ ĐỘNG KHỞI ĐỘNG LẠI APP 👇
+    private void restartApp() {
+        musicPlayer.saveState(); // Lưu lại bài hát đang nghe trước khi tắt
+        try {
+            String javaCmd = System.getProperty("java.home") + java.io.File.separator + "bin" + java.io.File.separator
+                    + "java";
+            java.io.File currentFile = new java.io.File(
+                    MikuMenu.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+
+            // Tự nhận diện đang chạy code trong IDE hay đang chạy file .jar / .exe
+            if (currentFile.getName().endsWith(".jar")) {
+                new ProcessBuilder(javaCmd, "-jar", currentFile.getPath()).start();
+            } else {
+                new ProcessBuilder(javaCmd, "-cp", System.getProperty("java.class.path"), "com.shimeji.miku.App")
+                        .start();
+            }
+        } catch (Exception ex) {
+            System.out.println("Lỗi khởi động lại: " + ex.getMessage());
+        }
+        System.exit(0); // Tắt app ngay lập tức
     }
 }

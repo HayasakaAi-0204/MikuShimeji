@@ -20,7 +20,6 @@ public class MikuWindow extends JWindow {
         this.miku = miku;
         this.initialClick = new Point();
         setupWindow();
-        // setupMenu();
         setupMouseEvents();
     }
 
