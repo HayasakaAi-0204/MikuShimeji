@@ -1,4 +1,3 @@
-// File 1: App.java
 package com.shimeji.miku;
 
 import com.formdev.flatlaf.FlatDarkLaf; // 👉 Thêm dòng này lên nhóm import đầu file
