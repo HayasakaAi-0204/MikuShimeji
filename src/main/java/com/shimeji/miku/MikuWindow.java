@@ -185,6 +185,12 @@ public class MikuWindow extends JWindow {
                 }
 
                 if (SwingUtilities.isLeftMouseButton(e)) {
+                    // 👉 Nếu Menu Taskbar đang mở dở thì dẹp ngay và mở khóa cho Miku cử động
+                    if (popupMenu != null && popupMenu.isVisible()) {
+                        popupMenu.setVisible(false);
+                    }
+                    miku.setPaused(false);
+
                     isLeftMouseDown = true;
                     miku.setState(CharacterState.DRAGGING);
 
@@ -201,11 +207,10 @@ public class MikuWindow extends JWindow {
 
             @Override
             public void mouseReleased(MouseEvent e) {
-                if (SwingUtilities.isLeftMouseButton(e)) {
-                    isLeftMouseDown = false;
-                    if (miku.getState() == CharacterState.DRAGGING && !popupMenu.isVisible()) {
-                        miku.setState(CharacterState.FALLING);
-                    }
+                isLeftMouseDown = false;
+                // Bỏ điều kiện if (SwingUtilities.isLeftMouseButton(e))
+                if (miku.getState() == CharacterState.DRAGGING) {
+                    miku.setState(CharacterState.FALLING);
                 }
             }
         });
@@ -213,10 +218,13 @@ public class MikuWindow extends JWindow {
             @Override
             public void mouseDragged(MouseEvent e) {
                 if (miku.getState() == CharacterState.DRAGGING) {
-                    if (popupMenu.isVisible())
+                    if (popupMenu != null && popupMenu.isVisible())
                         popupMenu.setVisible(false);
                     miku.setPosition(e.getLocationOnScreen().x - initialClick.x,
                             e.getLocationOnScreen().y - initialClick.y);
+                    // 👉 CẬP NHẬT CỬA SỔ NGAY LẬP TỨC (0ms trễ): Chuột không bao giờ bị văng ra
+                    // ngoài khung Miku!
+                    syncBounds();
                 }
             }
         });

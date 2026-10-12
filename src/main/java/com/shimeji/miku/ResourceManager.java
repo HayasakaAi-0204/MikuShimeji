@@ -27,23 +27,8 @@ public class ResourceManager {
     private static BufferedImage imgClimbPause;
     private static BufferedImage imgLeek;
 
-    // 👉 ĐÂY LÀ TRÁI TIM CỦA CƠ CHẾ GIỚI HẠN RAM (LRU CACHE)
-    // Giới hạn 250 ảnh (Tương đương khóa cứng khoảng 400MB - 500MB RAM)
-    private static final int MAX_CACHE_SIZE = 5000;
-    private static final Map<String, BufferedImage> frameCache = new LinkedHashMap<String, BufferedImage>(
-            MAX_CACHE_SIZE, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, BufferedImage> eldest) {
-            if (size() > MAX_CACHE_SIZE) {
-                // Giải phóng bộ nhớ của bức ảnh cũ nhất trước khi vứt nó ra khỏi hộp
-                if (eldest.getValue() != null) {
-                    eldest.getValue().flush();
-                }
-                return true;
-            }
-            return false;
-        }
-    };
+    // Bộ nhớ Cache: nạp ảnh 1 lần và tái sử dụng vĩnh viễn, không giới hạn
+    private static final Map<String, BufferedImage> frameCache = new java.util.HashMap<>();
 
     private ResourceManager() {
     }
