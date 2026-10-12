@@ -5,3 +5,4 @@ target/
 *.log
 GEMINI.md
 *.mp4
+dependency-reduced-pom.xml
