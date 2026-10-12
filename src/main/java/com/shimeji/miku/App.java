@@ -13,7 +13,7 @@ public class App {
         // CỨU CPU!
         System.setProperty("sun.java2d.d3d", "true");
         System.setProperty("sun.java2d.transaccel", "true");
-        try {
+        try  {
             // 👉 KÍCH NỔ ĐỘNG CƠ JAVAFX ĐỂ CHẠY NHẠC
             javafx.application.Platform.startup(() -> {
             });
